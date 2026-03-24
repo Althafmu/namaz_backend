@@ -12,7 +12,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     # JWT Authentication (custom view returns user info alongside tokens)
     path('api/auth/login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     # User Profile
     path('api/auth/profile/', ProfileView.as_view(), name='user-profile'),
     # Prayer API

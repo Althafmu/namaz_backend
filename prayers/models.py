@@ -88,7 +88,6 @@ class Streak(models.Model):
         Call this after a user completes all 5 prayers for a day.
         Handles streak increment, reset, and longest tracking.
         """
-        today = timezone.now().date()
 
         if self.last_completed_date is None:
             # First completed day ever
