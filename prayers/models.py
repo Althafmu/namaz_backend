@@ -34,6 +34,18 @@ class DailyPrayerLog(models.Model):
     maghrib_in_jamaat = models.BooleanField(default=False)
     isha_in_jamaat = models.BooleanField(default=False)
 
+    # Status and reason per prayer
+    fajr_status = models.CharField(max_length=20, default='on_time')
+    fajr_reason = models.CharField(max_length=255, blank=True, null=True)
+    dhuhr_status = models.CharField(max_length=20, default='on_time')
+    dhuhr_reason = models.CharField(max_length=255, blank=True, null=True)
+    asr_status = models.CharField(max_length=20, default='on_time')
+    asr_reason = models.CharField(max_length=255, blank=True, null=True)
+    maghrib_status = models.CharField(max_length=20, default='on_time')
+    maghrib_reason = models.CharField(max_length=255, blank=True, null=True)
+    isha_status = models.CharField(max_length=20, default='on_time')
+    isha_reason = models.CharField(max_length=255, blank=True, null=True)
+
     location = models.CharField(
         max_length=20,
         choices=LOCATION_CHOICES,

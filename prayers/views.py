@@ -97,6 +97,8 @@ def log_single_prayer(request):
     completed = request.data.get('completed', True)
     in_jamaat = request.data.get('in_jamaat', False)
     location = request.data.get('location', 'home')
+    prayer_status = request.data.get('status', 'on_time')
+    reason = request.data.get('reason', None)
 
     valid_prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
     if prayer_name not in valid_prayers:
@@ -114,6 +116,8 @@ def log_single_prayer(request):
     # Update the specific prayer field
     setattr(log, prayer_name, completed)
     setattr(log, f'{prayer_name}_in_jamaat', in_jamaat)
+    setattr(log, f'{prayer_name}_status', prayer_status)
+    setattr(log, f'{prayer_name}_reason', reason)
     log.location = location
     log.save()
 
@@ -124,3 +128,53 @@ def log_single_prayer(request):
 
     serializer = DailyPrayerLogSerializer(log)
     return Response(serializer.data)
+
+
+@api_view(['GET'])
+def detailed_prayer_history(request):
+    """
+    GET /api/prayers/history/detailed/?year=2026&month=4
+    Returns full DailyPrayerLog data for every day in the requested month.
+    Used by the calendar heatmap to restore per-prayer colors after reinstall.
+    """
+    today = timezone.now().date()
+    year = int(request.query_params.get('year', today.year))
+    month = int(request.query_params.get('month', today.month))
+
+    # Clamp to valid ranges
+    if month < 1 or month > 12:
+        return Response(
+            {'error': 'month must be between 1 and 12'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    logs = DailyPrayerLog.objects.filter(
+        user=request.user,
+        date__year=year,
+        date__month=month,
+    ).order_by('date')
+
+    serializer = DailyPrayerLogSerializer(logs, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+def reason_summary(request):
+    """
+    GET /api/prayers/reasons/
+    Returns aggregated reason counts across all time for the authenticated user.
+    Response: { "reasons": { "Work": 5, "Traffic": 3, ... } }
+    """
+    logs = DailyPrayerLog.objects.filter(user=request.user)
+
+    reason_counts = {}
+    prayer_names = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
+
+    for log in logs:
+        for prayer in prayer_names:
+            status_val = getattr(log, f'{prayer}_status', 'on_time')
+            reason_val = getattr(log, f'{prayer}_reason', None)
+            if status_val in ('late', 'missed') and reason_val:
+                reason_counts[reason_val] = reason_counts.get(reason_val, 0) + 1
+
+    return Response({'reasons': reason_counts})
