@@ -6,6 +6,14 @@ from django.utils import timezone
 from .models import DailyPrayerLog, Streak
 from .serializers import RegisterSerializer, DailyPrayerLogSerializer, StreakSerializer, UserProfileSerializer
 
+def get_effective_today():
+    """
+    Returns the effective date for prayer logging.
+    Times between midnight and 4:00 AM are attributed to the previous calendar day.
+    """
+    now = timezone.localtime()
+    return (now - timezone.timedelta(hours=4)).date()
+
 
 class RegisterView(generics.CreateAPIView):
     """POST /api/auth/register/ — Create a new user account."""
@@ -28,7 +36,7 @@ def today_prayer_log(request):
     GET  /api/prayers/today/ — Get today's prayer log.
     PUT  /api/prayers/today/ — Update today's prayer log.
     """
-    today = timezone.now().date()
+    today = get_effective_today()
     log, created = DailyPrayerLog.objects.get_or_create(
         user=request.user,
         date=today,
@@ -59,7 +67,7 @@ def prayer_history(request):
     Defaults to 7 days.
     """
     days = int(request.query_params.get('days', 7))
-    today = timezone.now().date()
+    today = get_effective_today()
     start_date = today - timezone.timedelta(days=days - 1)
 
     logs = DailyPrayerLog.objects.filter(
@@ -91,7 +99,7 @@ def streak_view(request):
 def log_single_prayer(request):
     """
     POST /api/prayers/log/ — Log a single prayer.
-    Body: { "prayer": "fajr", "completed": true, "in_jamaat": false, "location": "home" }
+    Body: { "prayer": "fajr", "completed": true, "in_jamaat": false, "location": "home", "date": "2026-04-10" }
     """
     prayer_name = request.data.get('prayer', '').lower()
     completed = request.data.get('completed', True)
@@ -99,6 +107,7 @@ def log_single_prayer(request):
     location = request.data.get('location', 'home')
     prayer_status = request.data.get('status', 'on_time')
     reason = request.data.get('reason', None)
+    date_str = request.data.get('date', None)
 
     valid_prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
     if prayer_name not in valid_prayers:
@@ -107,7 +116,18 @@ def log_single_prayer(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    today = timezone.now().date()
+    if date_str:
+        import datetime
+        try:
+            today = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return Response(
+                {'error': 'Invalid date format. Expected YYYY-MM-DD.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    else:
+        today = get_effective_today()
+
     log, created = DailyPrayerLog.objects.get_or_create(
         user=request.user,
         date=today,
@@ -137,7 +157,7 @@ def detailed_prayer_history(request):
     Returns full DailyPrayerLog data for every day in the requested month.
     Used by the calendar heatmap to restore per-prayer colors after reinstall.
     """
-    today = timezone.now().date()
+    today = get_effective_today()
     year = int(request.query_params.get('year', today.year))
     month = int(request.query_params.get('month', today.month))
 
