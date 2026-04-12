@@ -95,33 +95,62 @@ class Streak(models.Model):
     def __str__(self):
         return f"{self.user.username} — {self.current_streak} day streak"
 
-    def update_streak(self, completed_date):
+    def recalculate(self):
         """
-        Call this after a user completes all 5 prayers for a day.
-        Handles streak increment, reset, and longest tracking.
+        Full-history recalculation of streak data.
+        Scans every DailyPrayerLog for this user to rebuild
+        current_streak, longest_streak, and last_completed_date.
+        Safe for retroactive edits — order/timing of logs doesn't matter.
         """
+        completed_dates = list(
+            DailyPrayerLog.objects.filter(user=self.user)
+            .order_by('date')
+            .values_list('date', flat=True)
+        )
 
-        if self.last_completed_date is None:
-            # First completed day ever
-            self.current_streak = 1
-        elif completed_date == self.last_completed_date:
-            # Already counted this day
-            return
-        elif (completed_date - self.last_completed_date).days == 1:
-            # Consecutive day — increment streak
-            self.current_streak += 1
-        elif (completed_date - self.last_completed_date).days > 1:
-            # Missed day(s) — reset streak
-            self.current_streak = 1
+        # Filter to only dates where all 5 prayers are completed
+        complete_dates = []
+        if completed_dates:
+            logs = DailyPrayerLog.objects.filter(
+                user=self.user,
+                date__in=completed_dates,
+            )
+            for log in logs:
+                if log.is_complete:
+                    complete_dates.append(log.date)
+            complete_dates.sort()
 
-        self.last_completed_date = completed_date
-        if self.current_streak > self.longest_streak:
-            self.longest_streak = self.current_streak
+        # Reset everything
+        current = 0
+        longest = 0
+        last_completed = None
+
+        if complete_dates:
+            current = 1
+            last_completed = complete_dates[0]
+
+            for i in range(1, len(complete_dates)):
+                delta = (complete_dates[i] - complete_dates[i - 1]).days
+                if delta == 1:
+                    current += 1
+                elif delta > 1:
+                    # Gap detected — record longest and reset
+                    longest = max(longest, current)
+                    current = 1
+                # delta == 0 shouldn't happen (unique_together), but ignore it
+
+                last_completed = complete_dates[i]
+
+            longest = max(longest, current)
+
+            # Check gap from last completed date to today
+            today = timezone.now().date()
+            gap = (today - last_completed).days
+            if gap > 1:
+                # Streak is broken — missed at least one day
+                current = 0
+
+        self.current_streak = current
+        self.longest_streak = longest
+        self.last_completed_date = last_completed
         self.save()
-
-    def check_and_reset(self):
-        """Reset streak if user missed yesterday entirely."""
-        today = timezone.now().date()
-        if self.last_completed_date and (today - self.last_completed_date).days > 1:
-            self.current_streak = 0
-            self.save()

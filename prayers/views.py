@@ -51,10 +51,9 @@ def today_prayer_log(request):
         if serializer.is_valid():
             updated_log = serializer.save()
 
-            # Update streak if all prayers are now complete
-            if updated_log.is_complete:
-                streak, _ = Streak.objects.get_or_create(user=request.user)
-                streak.update_streak(today)
+            # Recalculate streak from full history
+            streak, _ = Streak.objects.get_or_create(user=request.user)
+            streak.recalculate()
 
             return Response(DailyPrayerLogSerializer(updated_log).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -88,8 +87,8 @@ def streak_view(request):
     """
     streak, created = Streak.objects.get_or_create(user=request.user)
 
-    # Check if streak should be reset (missed yesterday)
-    streak.check_and_reset()
+    # Full recalculation handles gap-to-today check automatically
+    streak.recalculate()
 
     serializer = StreakSerializer(streak)
     return Response(serializer.data)
@@ -141,10 +140,9 @@ def log_single_prayer(request):
     log.location = location
     log.save()
 
-    # Update streak if all prayers are now complete
-    if log.is_complete:
-        streak, _ = Streak.objects.get_or_create(user=request.user)
-        streak.update_streak(today)
+    # Recalculate streak from full history (handles both completions and un-completions)
+    streak, _ = Streak.objects.get_or_create(user=request.user)
+    streak.recalculate()
 
     serializer = DailyPrayerLogSerializer(log)
     return Response(serializer.data)
