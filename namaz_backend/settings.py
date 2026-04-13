@@ -109,29 +109,21 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS — open in dev, locked to specified origin in prod
-# Detect if we're in a known production environment
-_is_production = bool(os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RENDER'))
+cors_origin = os.environ.get('CORS_ALLOWED_ORIGIN')
 
-if DEBUG:
+if DEBUG or not cors_origin:
+    # Development or no CORS configured: allow all origins
     CORS_ALLOW_ALL_ORIGINS = True
-elif _is_production:
-    # Production: CORS must be explicitly configured
-    CORS_ALLOW_ALL_ORIGINS = False
-    cors_origin = os.environ.get('CORS_ALLOWED_ORIGIN')
-    if not cors_origin:
-        raise ImproperlyConfigured(
-            'CORS_ALLOWED_ORIGIN environment variable is required in production. '
-            'Set it to your frontend domain (e.g., https://your-app.vercel.app)'
+    if not DEBUG and not cors_origin:
+        warnings.warn(
+            'CORS_ALLOWED_ORIGIN not set. All origins are allowed. '
+            'Set CORS_ALLOWED_ORIGIN for production.',
+            UserWarning
         )
-    CORS_ALLOWED_ORIGINS = [cors_origin]
 else:
-    # Non-debug, non-production (e.g., staging or local with DEBUG=False)
-    # Allow all origins but warn if CORS_ALLOWED_ORIGIN not set
-    CORS_ALLOW_ALL_ORIGINS = True
-    warnings.warn(
-        'CORS_ALLOW_ALL_ORIGINS is enabled. Set CORS_ALLOWED_ORIGIN for production.',
-        UserWarning
-    )
+    # Production with explicit CORS: lock to specified origin
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = [cors_origin]
 
 # Django REST Framework
 REST_FRAMEWORK = {
