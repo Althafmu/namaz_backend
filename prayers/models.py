@@ -103,27 +103,23 @@ class Streak(models.Model):
     def recalculate(self):
         """
         Full-history recalculation of streak data.
-        Scans every DailyPrayerLog for this user to rebuild
-        current_streak, longest_streak, and last_completed_date.
+        Optimized: Single query with database-level filtering for complete days.
         Safe for retroactive edits — order/timing of logs doesn't matter.
         """
-        completed_dates = list(
-            DailyPrayerLog.objects.filter(user=self.user)
+        # Single query: get all dates where ALL 5 prayers are completed
+        # Uses database-level filtering instead of Python iteration
+        complete_dates = list(
+            DailyPrayerLog.objects.filter(
+                user=self.user,
+                fajr=True,
+                dhuhr=True,
+                asr=True,
+                maghrib=True,
+                isha=True,
+            )
             .order_by('date')
             .values_list('date', flat=True)
         )
-
-        # Filter to only dates where all 5 prayers are completed
-        complete_dates = []
-        if completed_dates:
-            logs = DailyPrayerLog.objects.filter(
-                user=self.user,
-                date__in=completed_dates,
-            )
-            for log in logs:
-                if log.is_complete:
-                    complete_dates.append(log.date)
-            complete_dates.sort()
 
         # Reset everything
         current = 0
@@ -159,3 +155,62 @@ class Streak(models.Model):
         self.longest_streak = longest
         self.last_completed_date = last_completed
         self.save()
+
+    def get_display_streak(self):
+        """
+        Returns the streak to display to the user.
+        During the first 12 hours of the day (midnight to noon),
+        shows the previous streak even if broken, for motivation.
+        """
+        now = timezone.localtime()
+        hour = now.hour
+        today = now.date()
+
+        # If streak is alive, always show it
+        if self.current_streak > 0:
+            return self.current_streak
+
+        # If after noon, show the actual streak (0 if broken)
+        if hour >= 12:
+            return self.current_streak
+
+        # Before noon: show motivation streak
+        # Calculate what the streak would be if counting backwards from yesterday
+        if not self.last_completed_date:
+            return 0
+
+        # If last completed was yesterday, count the streak up to yesterday
+        yesterday = today - timezone.timedelta(days=1)
+        if self.last_completed_date == yesterday:
+            # The streak broke today - show what it was before
+            # Count complete days backwards from yesterday using optimized query
+            complete_dates = list(
+                DailyPrayerLog.objects.filter(
+                    user=self.user,
+                    fajr=True,
+                    dhuhr=True,
+                    asr=True,
+                    maghrib=True,
+                    isha=True,
+                    date__lte=yesterday,
+                )
+                .order_by('-date')
+                .values_list('date', flat=True)
+            )
+            if not complete_dates:
+                return 0
+
+            # Count consecutive days backwards
+            streak_count = 1
+            prev_date = complete_dates[0]
+            for i in range(1, len(complete_dates)):
+                gap = (prev_date - complete_dates[i]).days
+                if gap == 1:
+                    streak_count += 1
+                    prev_date = complete_dates[i]
+                else:
+                    break
+            return streak_count
+
+        # Last completed was before yesterday - streak is genuinely broken
+        return self.current_streak

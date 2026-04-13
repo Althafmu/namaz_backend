@@ -2,6 +2,7 @@ from rest_framework import status, generics, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.utils import timezone
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 from .models import DailyPrayerLog, Streak
 from .serializers import RegisterSerializer, DailyPrayerLogSerializer, StreakSerializer, UserProfileSerializer
@@ -9,10 +10,9 @@ from .serializers import RegisterSerializer, DailyPrayerLogSerializer, StreakSer
 def get_effective_today():
     """
     Returns the effective date for prayer logging.
-    Times between midnight and 4:00 AM are attributed to the previous calendar day.
+    Uses midnight rollover to match frontend behavior.
     """
-    now = timezone.localtime()
-    return (now - timezone.timedelta(hours=4)).date()
+    return timezone.localtime().date()
 
 
 class RegisterView(generics.CreateAPIView):
@@ -28,6 +28,20 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class DeleteAccountView(generics.DestroyAPIView):
+    """DELETE /api/auth/delete/ — Delete the authenticated user's account."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def destroy(self, request, *args, **kwargs):
+        user = request.user
+        username = user.username
+        user.delete()
+        return Response(
+            {'message': f'Account "{username}" has been permanently deleted.'},
+            status=status.HTTP_204_NO_CONTENT,
+        )
 
 
 @api_view(['GET', 'PUT'])
@@ -62,8 +76,8 @@ def today_prayer_log(request):
 @api_view(['GET'])
 def prayer_history(request):
     """
-    GET /api/prayers/history/?days=7 — Get prayer logs for the last N days.
-    Defaults to 7 days. Maximum 365 days.
+    GET /api/prayers/history/?days=7&page=1 — Get prayer logs for the last N days.
+    Defaults to 7 days. Maximum 365 days. Paginated with 30 days per page.
     """
     try:
         days = int(request.query_params.get('days', 7))
@@ -80,6 +94,14 @@ def prayer_history(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    try:
+        page = int(request.query_params.get('page', 1))
+    except (ValueError, TypeError):
+        page = 1
+
+    page_size = 30
+    page = max(1, page)
+
     today = get_effective_today()
     start_date = today - timezone.timedelta(days=days - 1)
 
@@ -89,8 +111,20 @@ def prayer_history(request):
         date__lte=today,
     ).order_by('date')
 
-    serializer = DailyPrayerLogSerializer(logs, many=True)
-    return Response(serializer.data)
+    # Paginate
+    total_count = logs.count()
+    total_pages = max(1, (total_count + page_size - 1) // page_size)
+    offset = (page - 1) * page_size
+    logs_page = logs[offset:offset + page_size]
+
+    serializer = DailyPrayerLogSerializer(logs_page, many=True)
+    return Response({
+        'results': serializer.data,
+        'count': total_count,
+        'page': page,
+        'total_pages': total_pages,
+        'page_size': page_size,
+    })
 
 
 @api_view(['GET'])
@@ -141,29 +175,64 @@ def log_single_prayer(request):
     if reason:
         reason = str(reason).strip()[:255]
 
+    today = get_effective_today()
+
     if date_str:
         import datetime
         try:
-            today = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+            target_date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
         except ValueError:
             return Response(
                 {'error': 'Invalid date format. Expected YYYY-MM-DD.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # Validate edit window: only allow today, yesterday, and 2 days ago
+        days_ago = (today - target_date).days
+        if days_ago < 0:
+            return Response(
+                {'error': 'Cannot log prayers for future dates.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if days_ago > 2:
+            return Response(
+                {'error': 'Cannot edit prayers more than 2 days in the past.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
     else:
-        today = get_effective_today()
+        target_date = today
 
     log, created = DailyPrayerLog.objects.get_or_create(
         user=request.user,
-        date=today,
+        date=target_date,
     )
 
-    # Update the specific prayer field
-    setattr(log, prayer_name, completed)
-    setattr(log, f'{prayer_name}_in_jamaat', in_jamaat)
-    setattr(log, f'{prayer_name}_status', prayer_status)
-    setattr(log, f'{prayer_name}_reason', reason)
+    # Update the specific prayer field using explicit field mapping
+    # This is safer than setattr and follows Django best practices
+    prayer_field_map = {
+        'fajr': ('fajr', 'fajr_in_jamaat', 'fajr_status', 'fajr_reason'),
+        'dhuhr': ('dhuhr', 'dhuhr_in_jamaat', 'dhuhr_status', 'dhuhr_reason'),
+        'asr': ('asr', 'asr_in_jamaat', 'asr_status', 'asr_reason'),
+        'maghrib': ('maghrib', 'maghrib_in_jamaat', 'maghrib_status', 'maghrib_reason'),
+        'isha': ('isha', 'isha_in_jamaat', 'isha_status', 'isha_reason'),
+    }
+
+    fields = prayer_field_map[prayer_name]
+    setattr(log, fields[0], completed)
+    setattr(log, fields[1], in_jamaat)
+    setattr(log, fields[2], prayer_status)
+    setattr(log, fields[3], reason)
     log.location = location
+
+    # Run Django model validation before saving
+    try:
+        log.full_clean()
+    except DjangoValidationError as e:
+        return Response(
+            {'error': f'Validation error: {e.message_dict}'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     log.save()
 
     # Recalculate streak from full history (handles both completions and un-completions)
@@ -177,9 +246,10 @@ def log_single_prayer(request):
 @api_view(['GET'])
 def detailed_prayer_history(request):
     """
-    GET /api/prayers/history/detailed/?year=2026&month=4
+    GET /api/prayers/history/detailed/?year=2026&month=4&page=1
     Returns full DailyPrayerLog data for every day in the requested month.
     Used by the calendar heatmap to restore per-prayer colors after reinstall.
+    Paginated with 15 days per page.
     """
     today = get_effective_today()
 
@@ -206,14 +276,34 @@ def detailed_prayer_history(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    try:
+        page = int(request.query_params.get('page', 1))
+    except (ValueError, TypeError):
+        page = 1
+
+    page_size = 15
+    page = max(1, page)
+
     logs = DailyPrayerLog.objects.filter(
         user=request.user,
         date__year=year,
         date__month=month,
     ).order_by('date')
 
-    serializer = DailyPrayerLogSerializer(logs, many=True)
-    return Response(serializer.data)
+    # Paginate
+    total_count = logs.count()
+    total_pages = max(1, (total_count + page_size - 1) // page_size)
+    offset = (page - 1) * page_size
+    logs_page = logs[offset:offset + page_size]
+
+    serializer = DailyPrayerLogSerializer(logs_page, many=True)
+    return Response({
+        'results': serializer.data,
+        'count': total_count,
+        'page': page,
+        'total_pages': total_pages,
+        'page_size': page_size,
+    })
 
 
 @api_view(['GET'])
@@ -222,17 +312,31 @@ def reason_summary(request):
     GET /api/prayers/reasons/
     Returns aggregated reason counts across all time for the authenticated user.
     Response: { "reasons": { "Work": 5, "Traffic": 3, ... } }
+    Optimized: Uses database aggregation instead of loading all logs into memory.
     """
-    logs = DailyPrayerLog.objects.filter(user=request.user)
+    from django.db.models import Count, Q
 
-    reason_counts = {}
     prayer_names = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
+    reason_counts = {}
 
-    for log in logs:
-        for prayer in prayer_names:
-            status_val = getattr(log, f'{prayer}_status', 'on_time')
-            reason_val = getattr(log, f'{prayer}_reason', None)
-            if status_val in ('late', 'missed') and reason_val:
-                reason_counts[reason_val] = reason_counts.get(reason_val, 0) + 1
+    for prayer in prayer_names:
+        # Use database aggregation for each prayer's reason field
+        status_field = f'{prayer}_status'
+        reason_field = f'{prayer}_reason'
+
+        # Aggregate reasons where status is 'late' or 'missed' and reason exists
+        reasons = (
+            DailyPrayerLog.objects.filter(user=request.user)
+            .filter(**{f'{status_field}__in': ['late', 'missed']})
+            .exclude(**{f'{reason_field}__isnull': True})
+            .exclude(**{f'{reason_field}': ''})
+            .values(reason_field)
+            .annotate(count=Count(reason_field))
+        )
+
+        for item in reasons:
+            reason = item[reason_field]
+            if reason:
+                reason_counts[reason] = reason_counts.get(reason, 0) + item['count']
 
     return Response({'reasons': reason_counts})

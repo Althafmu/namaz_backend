@@ -73,8 +73,13 @@ class DailyPrayerLogSerializer(serializers.ModelSerializer):
 
 class StreakSerializer(serializers.ModelSerializer):
     """Serializes the streak info."""
+    display_streak = serializers.SerializerMethodField()
 
     class Meta:
         model = Streak
-        fields = ('current_streak', 'longest_streak', 'last_completed_date')
+        fields = ('current_streak', 'longest_streak', 'last_completed_date', 'display_streak')
         read_only_fields = fields
+
+    def get_display_streak(self, obj):
+        """Returns the streak value to display (with grace period before noon)."""
+        return obj.get_display_streak()
