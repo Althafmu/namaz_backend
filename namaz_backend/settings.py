@@ -3,13 +3,30 @@ Django settings for namaz_backend project.
 """
 
 import os
+import warnings
 from pathlib import Path
 from datetime import timedelta
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-namaz-tracker-dev-key-change-in-production')
+# SECURITY: SECRET_KEY must be set via environment variable in production.
+# Local development can use the default, but production MUST set SECRET_KEY.
+SECRET_KEY = os.environ.get('SECRET_KEY')
+
+if not SECRET_KEY:
+    if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RENDER'):
+        raise ImproperlyConfigured(
+            'SECRET_KEY environment variable is required in production. '
+            'Set it in your deployment platform settings.'
+        )
+    # Local development fallback only
+    SECRET_KEY = 'django-insecure-local-dev-key-not-for-production-use'
+    warnings.warn(
+        'Using insecure default SECRET_KEY. Set SECRET_KEY environment variable for security.',
+        UserWarning
+    )
 
 # True if locally, False if deployed and DEBUG not explicitly set to True
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
@@ -91,14 +108,18 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS — open in dev, locked to Railway domain in prod
+# CORS — open in dev, locked to specified origin in prod
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
     CORS_ALLOW_ALL_ORIGINS = False
-    CORS_ALLOWED_ORIGINS = [
-        os.environ.get('CORS_ALLOWED_ORIGIN', 'https://web-production-f44da.up.railway.app'),
-    ]
+    cors_origin = os.environ.get('CORS_ALLOWED_ORIGIN')
+    if not cors_origin:
+        raise ImproperlyConfigured(
+            'CORS_ALLOWED_ORIGIN environment variable is required in production. '
+            'Set it to your frontend domain (e.g., https://your-app.vercel.app)'
+        )
+    CORS_ALLOWED_ORIGINS = [cors_origin]
 
 # Django REST Framework
 REST_FRAMEWORK = {

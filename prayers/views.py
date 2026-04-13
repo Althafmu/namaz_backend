@@ -63,9 +63,23 @@ def today_prayer_log(request):
 def prayer_history(request):
     """
     GET /api/prayers/history/?days=7 — Get prayer logs for the last N days.
-    Defaults to 7 days.
+    Defaults to 7 days. Maximum 365 days.
     """
-    days = int(request.query_params.get('days', 7))
+    try:
+        days = int(request.query_params.get('days', 7))
+    except (ValueError, TypeError):
+        return Response(
+            {'error': 'days parameter must be a valid integer'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Prevent abuse: cap at 365 days
+    if days < 1 or days > 365:
+        return Response(
+            {'error': 'days parameter must be between 1 and 365'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     today = get_effective_today()
     start_date = today - timezone.timedelta(days=days - 1)
 
@@ -115,6 +129,18 @@ def log_single_prayer(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    # Validate status field
+    valid_statuses = ['on_time', 'late', 'missed']
+    if prayer_status not in valid_statuses:
+        return Response(
+            {'error': f'Invalid status. Must be one of: {valid_statuses}'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Sanitize reason field (max 255 chars, strip whitespace)
+    if reason:
+        reason = str(reason).strip()[:255]
+
     if date_str:
         import datetime
         try:
@@ -156,8 +182,22 @@ def detailed_prayer_history(request):
     Used by the calendar heatmap to restore per-prayer colors after reinstall.
     """
     today = get_effective_today()
-    year = int(request.query_params.get('year', today.year))
-    month = int(request.query_params.get('month', today.month))
+
+    try:
+        year = int(request.query_params.get('year', today.year))
+    except (ValueError, TypeError):
+        return Response(
+            {'error': 'year parameter must be a valid integer'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        month = int(request.query_params.get('month', today.month))
+    except (ValueError, TypeError):
+        return Response(
+            {'error': 'month parameter must be a valid integer'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     # Clamp to valid ranges
     if month < 1 or month > 12:

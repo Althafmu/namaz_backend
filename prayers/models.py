@@ -35,15 +35,20 @@ class DailyPrayerLog(models.Model):
     isha_in_jamaat = models.BooleanField(default=False)
 
     # Status and reason per prayer
-    fajr_status = models.CharField(max_length=20, default='on_time')
+    STATUS_CHOICES = [
+        ('on_time', 'On Time'),
+        ('late', 'Late'),
+        ('missed', 'Missed'),
+    ]
+    fajr_status = models.CharField(max_length=20, default='on_time', choices=STATUS_CHOICES)
     fajr_reason = models.CharField(max_length=255, blank=True, null=True)
-    dhuhr_status = models.CharField(max_length=20, default='on_time')
+    dhuhr_status = models.CharField(max_length=20, default='on_time', choices=STATUS_CHOICES)
     dhuhr_reason = models.CharField(max_length=255, blank=True, null=True)
-    asr_status = models.CharField(max_length=20, default='on_time')
+    asr_status = models.CharField(max_length=20, default='on_time', choices=STATUS_CHOICES)
     asr_reason = models.CharField(max_length=255, blank=True, null=True)
-    maghrib_status = models.CharField(max_length=20, default='on_time')
+    maghrib_status = models.CharField(max_length=20, default='on_time', choices=STATUS_CHOICES)
     maghrib_reason = models.CharField(max_length=255, blank=True, null=True)
-    isha_status = models.CharField(max_length=20, default='on_time')
+    isha_status = models.CharField(max_length=20, default='on_time', choices=STATUS_CHOICES)
     isha_reason = models.CharField(max_length=255, blank=True, null=True)
 
     location = models.CharField(
