@@ -18,7 +18,7 @@ class DailyPrayerLog(models.Model):
         on_delete=models.CASCADE,
         related_name='prayer_logs',
     )
-    date = models.DateField(default=timezone.now)
+    date = models.DateField(default=timezone.localdate)
 
     # Each prayer: True = prayed, False = missed
     fajr = models.BooleanField(default=False)
@@ -96,16 +96,28 @@ class Streak(models.Model):
     current_streak = models.PositiveIntegerField(default=0)
     longest_streak = models.PositiveIntegerField(default=0)
     last_completed_date = models.DateField(null=True, blank=True)
+    last_recalculated_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.user.username} — {self.current_streak} day streak"
 
-    def recalculate(self):
+    def recalculate(self, force=False):
         """
-        Full-history recalculation of streak data.
-        Optimized: Single query with database-level filtering for complete days.
-        Safe for retroactive edits — order/timing of logs doesn't matter.
+        Recalculate streak data.
+        Optimized: Only performs full recalculation when necessary.
+
+        Args:
+            force: If True, always recalculate. If False, skip if already
+                   calculated today (stale data is fine for same-day requests).
         """
+        today = timezone.localdate()
+
+        # Skip recalculation if already done today (unless forced)
+        if not force and self.last_recalculated_at:
+            last_calc_date = timezone.localtime(self.last_recalculated_at).date()
+            if last_calc_date == today:
+                return  # Already calculated today, cached data is fine
+
         # Single query: get all dates where ALL 5 prayers are completed
         # Uses database-level filtering instead of Python iteration
         complete_dates = list(
@@ -145,7 +157,6 @@ class Streak(models.Model):
             longest = max(longest, current)
 
             # Check gap from last completed date to today
-            today = timezone.now().date()
             gap = (today - last_completed).days
             if gap > 1:
                 # Streak is broken — missed at least one day
@@ -154,6 +165,7 @@ class Streak(models.Model):
         self.current_streak = current
         self.longest_streak = longest
         self.last_completed_date = last_completed
+        self.last_recalculated_at = timezone.now()
         self.save()
 
     def get_display_streak(self):

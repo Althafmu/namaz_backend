@@ -65,9 +65,9 @@ def today_prayer_log(request):
         if serializer.is_valid():
             updated_log = serializer.save()
 
-            # Recalculate streak from full history
+            # Recalculate streak from full history (force since prayer log changed)
             streak, _ = Streak.objects.get_or_create(user=request.user)
-            streak.recalculate()
+            streak.recalculate(force=True)
 
             return Response(DailyPrayerLogSerializer(updated_log).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -235,9 +235,9 @@ def log_single_prayer(request):
 
     log.save()
 
-    # Recalculate streak from full history (handles both completions and un-completions)
+    # Recalculate streak from full history (force since prayer log changed)
     streak, _ = Streak.objects.get_or_create(user=request.user)
-    streak.recalculate()
+    streak.recalculate(force=True)
 
     serializer = DailyPrayerLogSerializer(log)
     return Response(serializer.data)
