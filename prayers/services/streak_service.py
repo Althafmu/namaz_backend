@@ -57,18 +57,24 @@ def get_recovery_status(prayer_log, streak):
 
     prayer_keys = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
     now = timezone.now()
-    cutoff_next = get_cutoff_datetime_for_date(prayer_log.date) + timedelta(days=1)
+    cutoff_next = get_cutoff_datetime_for_date(prayer_log.date)
 
     # Token eligibility: just check if tokens available, not cooldown/consumption rules
     # Recovery eligibility ≠ token consumption eligibility
     has_tokens = streak.protector_tokens > 0
 
     result = {}
+    # Only protect the LATEST missed prayer (token economy: one token = one prayer)
+    # Prayer order: fajr < dhuhr < asr < maghrib < isha
+    missed_prayers = [key for key in prayer_keys
+                      if getattr(prayer_log, f'{key}_status') == 'missed']
+    latest_missed = missed_prayers[-1] if missed_prayers else None
+
     for key in prayer_keys:
         status = getattr(prayer_log, f'{key}_status')
         if status == 'missed':
             within_window = now < cutoff_next
-            is_protected = within_window and has_tokens
+            is_protected = (key == latest_missed) and within_window and has_tokens
 
             if is_protected:
                 result[key] = {
@@ -79,7 +85,7 @@ def get_recovery_status(prayer_log, streak):
             else:
                 result[key] = {
                     'is_protected': False,
-                    'expires_at': cutoff_next.isoformat() if within_window else None,
+                    'expires_at': None,
                     'requires_qada': False,
                 }
         else:

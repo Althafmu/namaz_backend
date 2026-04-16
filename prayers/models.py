@@ -263,6 +263,7 @@ class Streak(models.Model):
                 any_protected = any(v['is_protected'] for v in recovery.values())
                 if any_protected:
                     # Protection active: preserve chain continuity, don't increment
+                    chain_is_alive = True
                     previous_date = log.date
                     continue
                 # Protection expired: break streak
