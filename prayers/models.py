@@ -226,7 +226,11 @@ class Streak(models.Model):
 
         Fully excused days keep the current streak alive without incrementing it.
         Pending or incomplete days do not count and will eventually break the chain.
+        Recovery (protection) window: if a missed day has active protection, the chain
+        stays alive so the user can still log Qada before the window closes.
         """
+        from prayers.services.streak_service import get_recovery_status
+
         today = timezone.localdate()
 
         if not force and self.last_recalculated_at:
@@ -254,6 +258,14 @@ class Streak(models.Model):
                 chain_is_alive = False
 
             if not log.is_valid_for_streak:
+                # Check if protection is still active — chain stays alive during window
+                recovery = get_recovery_status(log, self)
+                if recovery['is_protected']:
+                    # Protection active: preserve chain, don't increment
+                    chain_is_alive = True
+                    previous_date = log.date
+                    continue
+                # Protection expired or not available: break streak
                 longest = max(longest, current_chain_count)
                 current_chain_count = 0
                 chain_is_alive = False
@@ -302,29 +314,6 @@ class Streak(models.Model):
                 }
 
         return {'allowed': True, 'reason': None}
-
-    def get_recovery_status(self, prayer_log=None):
-        """
-        Sprint 1: Return recovery state for a missed prayer.
-        Used by frontend to show temporary protection UI (PRD Recovery UX section).
-        """
-        if prayer_log is None:
-            return {'is_protected': False, 'expires_at': None, 'requires_qada': False}
-
-        # Recovery window: 24 hours from prayer time
-        if hasattr(prayer_log, 'date'):
-            from datetime import timedelta
-            window_end = timezone.make_aware(
-                timezone.datetime.combine(prayer_log.date, timezone.datetime.max.time())
-            )
-            # PRD: 24h window from the missed prayer
-            if timezone.now() < window_end + timedelta(hours=24):
-                return {
-                    'is_protected': True,
-                    'expires_at': (window_end + timedelta(hours=24)).isoformat(),
-                    'requires_qada': True,
-                }
-        return {'is_protected': False, 'expires_at': None, 'requires_qada': False}
 
     def consume_protector_token(self):
         """

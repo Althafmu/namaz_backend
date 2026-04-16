@@ -94,6 +94,8 @@ def today_prayer_log(request):
     GET  /api/prayers/today/ — Get today's prayer log.
     PUT  /api/prayers/today/ — Update today's prayer log.
     """
+    from prayers.services.streak_service import attach_recovery_to_logs
+
     today = get_effective_today()
     log, created = DailyPrayerLog.objects.get_or_create(
         user=request.user,
@@ -101,6 +103,7 @@ def today_prayer_log(request):
     )
 
     if request.method == 'GET':
+        attach_recovery_to_logs([log], request.user)
         serializer = DailyPrayerLogSerializer(log)
         return Response(serializer.data)
 
@@ -113,6 +116,7 @@ def today_prayer_log(request):
             streak, _ = Streak.objects.get_or_create(user=request.user)
             streak.recalculate(force=True)
 
+            attach_recovery_to_logs([updated_log], request.user)
             return Response(DailyPrayerLogSerializer(updated_log).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -283,6 +287,10 @@ def log_single_prayer(request):
     # Recalculate streak from full history (force since prayer log changed)
     streak, _ = Streak.objects.get_or_create(user=request.user)
     streak.recalculate(force=True)
+
+    # Attach recovery status for UI
+    from prayers.services.streak_service import attach_recovery_to_logs
+    attach_recovery_to_logs([log], request.user)
 
     serializer = DailyPrayerLogSerializer(log)
     return Response(serializer.data)
