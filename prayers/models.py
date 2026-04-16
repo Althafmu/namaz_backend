@@ -178,6 +178,8 @@ class Streak(models.Model):
     """Tracks continuous prayer streak for a user."""
 
     MAX_PROTECTOR_TOKENS = 3
+    WEEKLY_TOKEN_LIMIT = 3  # Max 3 token recoveries per week (PRD Sprint 1)
+    ANTI_GAMING_COOLDOWN_HOURS = 24  # Cannot recover more than 1 day per 24h
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -192,6 +194,10 @@ class Streak(models.Model):
     protector_tokens = models.PositiveIntegerField(default=MAX_PROTECTOR_TOKENS)
     tokens_reset_date = models.DateField(null=True, blank=True)
 
+    # Sprint 1: Weekly token tracking + anti-gaming
+    weekly_tokens_used = models.PositiveIntegerField(default=0)  # Tokens consumed this week
+    last_token_used_at = models.DateTimeField(null=True, blank=True)  # Anti-gaming cooldown
+
     def __str__(self):
         return f'{self.user.username} - {self.current_streak} day streak'
 
@@ -201,7 +207,18 @@ class Streak(models.Model):
 
     @staticmethod
     def _current_week_start(target_date):
-        return target_date - timedelta(days=target_date.weekday())
+        """Returns Sunday 0:00 for the week containing target_date."""
+        # weekday() returns 0=Monday, 6=Sunday. Convert to Sunday-based week.
+        days_since_sunday = (target_date.weekday() + 1) % 7
+        return target_date - timedelta(days=days_since_sunday)
+
+    def _is_new_week(self, last_reset_date):
+        """Check if we need a fresh weekly window (Sunday 3 AM local)."""
+        if last_reset_date is None:
+            return True
+        today = timezone.localdate()
+        current_week_start = self._current_week_start(today)
+        return current_week_start > last_reset_date
 
     def recalculate(self, force=False):
         """
@@ -217,11 +234,10 @@ class Streak(models.Model):
             if last_calc_date == today:
                 return
 
-        current_week_start = self._current_week_start(today)
-        if self.tokens_reset_date != current_week_start:
-            if self.tokens_reset_date is not None:
-                self.protector_tokens = self.MAX_PROTECTOR_TOKENS
-            self.tokens_reset_date = current_week_start
+        # Sprint 1: Sunday-based weekly reset for tokens (PRD)
+        if self._is_new_week(self.tokens_reset_date):
+            self.weekly_tokens_used = 0
+            self.tokens_reset_date = self._current_week_start(today)
 
         current = 0
         longest = 0
@@ -262,14 +278,69 @@ class Streak(models.Model):
         self.last_recalculated_at = timezone.now()
         self.save()
 
+    def can_use_token(self, target_date=None):
+        """
+        Sprint 1: Check if user can consume a token right now.
+        Returns dict with 'allowed' bool and 'reason' string.
+        Anti-gaming: Cannot recover more than 1 day per 24h.
+        """
+        # Check weekly limit
+        if self.weekly_tokens_used >= self.WEEKLY_TOKEN_LIMIT:
+            return {
+                'allowed': False,
+                'reason': 'Weekly recovery limit reached. Tokens reset every Sunday.',
+            }
+
+        # Check anti-gaming cooldown
+        if self.last_token_used_at:
+            hours_since = (timezone.now() - self.last_token_used_at).total_seconds() / 3600
+            if hours_since < self.ANTI_GAMING_COOLDOWN_HOURS:
+                remaining = self.ANTI_GAMING_COOLDOWN_HOURS - hours_since
+                return {
+                    'allowed': False,
+                    'reason': f'Cooldown active. Next recovery allowed in {int(remaining)} hours.',
+                }
+
+        return {'allowed': True, 'reason': None}
+
+    def get_recovery_status(self, prayer_log=None):
+        """
+        Sprint 1: Return recovery state for a missed prayer.
+        Used by frontend to show temporary protection UI (PRD Recovery UX section).
+        """
+        if prayer_log is None:
+            return {'is_protected': False, 'expires_at': None, 'requires_qada': False}
+
+        # Recovery window: 24 hours from prayer time
+        if hasattr(prayer_log, 'date'):
+            from datetime import timedelta
+            window_end = timezone.make_aware(
+                timezone.datetime.combine(prayer_log.date, timezone.datetime.max.time())
+            )
+            # PRD: 24h window from the missed prayer
+            if timezone.now() < window_end + timedelta(hours=24):
+                return {
+                    'is_protected': True,
+                    'expires_at': (window_end + timedelta(hours=24)).isoformat(),
+                    'requires_qada': True,
+                }
+        return {'is_protected': False, 'expires_at': None, 'requires_qada': False}
+
     def consume_protector_token(self):
         """
         Consume a protector token to save streak.
         Returns True if token was consumed, False if none available.
+        Sprint 1: Now tracks weekly usage and last token used time for anti-gaming.
         """
+        can_use = self.can_use_token()
+        if not can_use['allowed']:
+            return False
+
         if self.protector_tokens > 0:
             self.protector_tokens -= 1
-            self.save(update_fields=['protector_tokens'])
+            self.weekly_tokens_used += 1
+            self.last_token_used_at = timezone.now()
+            self.save(update_fields=['protector_tokens', 'weekly_tokens_used', 'last_token_used_at'])
             return True
         return False
 

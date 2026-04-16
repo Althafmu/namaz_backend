@@ -393,7 +393,10 @@ def consume_protector_token(request):
     POST /api/streak/consume-token/ — Consume a protector token to save streak.
     Used when a user prays Qada for a missed prayer within 24 hours.
 
-    Phase 2: Streak freeze system.
+    Sprint 1 (Phase 3 PRD):
+    - Weekly limit: 3 token recoveries per week (Sunday 3 AM reset)
+    - Anti-gaming: Cannot recover more than 1 day per 24h
+
     Body: { "date": "2026-04-15" }  (optional, defaults to yesterday)
 
     Returns the updated streak info.
@@ -402,10 +405,19 @@ def consume_protector_token(request):
 
     streak, _ = Streak.objects.get_or_create(user=request.user)
 
+    # Sprint 1: Check weekly limit + anti-gaming cooldown
+    can_use = streak.can_use_token()
+    if not can_use['allowed']:
+        return Response(
+            {'error': can_use['reason'],
+             'streak': StreakSerializer(streak).data},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     # Check if tokens available
     if streak.protector_tokens <= 0:
         return Response(
-            {'error': 'No protector tokens available. Tokens reset weekly on Monday.',
+            {'error': 'No protector tokens available. Tokens reset every Sunday.',
              'streak': StreakSerializer(streak).data},
             status=status.HTTP_400_BAD_REQUEST,
         )
@@ -454,7 +466,7 @@ def consume_protector_token(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Consume the token
+    # Consume the token (anti-gaming + weekly limit checks already passed)
     streak.consume_protector_token()
 
     # Force recalculate streak (the Qada prayers should now count)
@@ -463,6 +475,7 @@ def consume_protector_token(request):
     return Response({
         'message': f'Protector token consumed for {target_date}.',
         'tokens_remaining': streak.protector_tokens,
+        'weekly_tokens_remaining': streak.WEEKLY_TOKEN_LIMIT - streak.weekly_tokens_used,
         'streak': StreakSerializer(streak).data,
     })
 
