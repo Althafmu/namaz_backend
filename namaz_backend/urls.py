@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from prayers.serializers import CustomTokenObtainPairSerializer
-from prayers.views import ProfileView, DeleteAccountView
+from prayers.views import ProfileView, DeleteAccountView, profile_offsets_view
 
 # Custom login view that includes user data in the response
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -15,6 +15,8 @@ urlpatterns = [
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     # User Profile
     path('api/auth/profile/', ProfileView.as_view(), name='user-profile'),
+    # Cloud Sync — calculation settings
+    path('api/profile/offsets/', profile_offsets_view, name='profile-offsets'),
     # Delete Account
     path('api/auth/delete/', DeleteAccountView.as_view(), name='delete-account'),
     # Prayer API

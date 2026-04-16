@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import DailyPrayerLog, Streak
+from .models import DailyPrayerLog, Streak, UserSettings
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -10,6 +10,14 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ('id', 'username', 'email', 'first_name', 'last_name')
         read_only_fields = fields
+
+
+class UserSettingsSerializer(serializers.ModelSerializer):
+    """Serializer for user calculation settings (cloud sync)."""
+
+    class Meta:
+        model = UserSettings
+        fields = ('manual_offsets', 'calculation_method', 'use_hanafi')
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -36,17 +44,19 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user = User.objects.create_user(**validated_data)
-        # Create a streak record for the new user
+        # Create a streak record and default settings for the new user
         Streak.objects.create(user=user)
+        UserSettings.objects.create(user=user)
         return user
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    """Serializer for updating user profile (first_name, last_name)."""
+    """Serializer for user profile with embedded settings (GET /api/auth/profile/)."""
+    settings = UserSettingsSerializer(read_only=True)
+
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name')
-        read_only_fields = ('id', 'username', 'email')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'settings')
 
 
 class DailyPrayerLogSerializer(serializers.ModelSerializer):
@@ -74,10 +84,14 @@ class DailyPrayerLogSerializer(serializers.ModelSerializer):
 class StreakSerializer(serializers.ModelSerializer):
     """Serializes the streak info."""
     display_streak = serializers.SerializerMethodField()
+    max_protector_tokens = serializers.ReadOnlyField()
 
     class Meta:
         model = Streak
-        fields = ('current_streak', 'longest_streak', 'last_completed_date', 'display_streak')
+        fields = (
+            'current_streak', 'longest_streak', 'last_completed_date', 'display_streak',
+            'protector_tokens', 'max_protector_tokens', 'tokens_reset_date',
+        )
         read_only_fields = fields
 
     def get_display_streak(self, obj):
