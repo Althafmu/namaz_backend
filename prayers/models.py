@@ -258,14 +258,14 @@ class Streak(models.Model):
                 chain_is_alive = False
 
             if not log.is_valid_for_streak:
-                # Check if protection is still active — chain stays alive during window
+                # Check if protection is still active — chain survives during window
                 recovery = get_recovery_status(log, self)
-                if recovery['is_protected']:
-                    # Protection active: preserve chain, don't increment
-                    chain_is_alive = True
+                any_protected = any(v['is_protected'] for v in recovery.values())
+                if any_protected:
+                    # Protection active: preserve chain continuity, don't increment
                     previous_date = log.date
                     continue
-                # Protection expired or not available: break streak
+                # Protection expired: break streak
                 longest = max(longest, current_chain_count)
                 current_chain_count = 0
                 chain_is_alive = False

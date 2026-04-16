@@ -39,59 +39,57 @@ def get_recovery_status(prayer_log, streak):
 
     Recovery is active when ALL of these are true:
     1. Prayer is missed
-    2. Within 24h of 3 AM cutoff (i.e., before next cutoff)
-    3. User has available tokens (can_use_token returns allowed)
+    2. Before next 3 AM cutoff (window is from missed time → next cutoff)
+    3. User has available tokens (protector_tokens > 0)
 
-    Returns dict:
-        {
-            "is_protected": bool,
-            "expires_at": ISO string or None,
-            "requires_qada": bool,
-        }
+    Returns per-prayer dict so frontend can show which specific prayer needs Qada:
+    {
+        "fajr": {"is_protected": bool, "expires_at": str|None, "requires_qada": bool},
+        ...
+    }
 
     Single source of truth — called from both view (to attach to objects)
     and serializer (to read pre-computed value).
     """
     if prayer_log is None or streak is None:
-        return {'is_protected': False, 'expires_at': None, 'requires_qada': False}
+        return {k: {'is_protected': False, 'expires_at': None, 'requires_qada': False}
+                for k in ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']}
 
-    # Find which prayer(s) are missed on this log
     prayer_keys = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
-    missed_prayers = [
-        key for key in prayer_keys
-        if getattr(prayer_log, f'{key}_status') == 'missed'
-    ]
-
-    if not missed_prayers:
-        return {'is_protected': False, 'expires_at': None, 'requires_qada': False}
-
-    # Recovery window: from cutoff of missed day, up to next cutoff (24h)
-    # Window = from 3am next day to 3am the day after = exactly 24h
-    cutoff_today = get_cutoff_datetime_for_date(prayer_log.date)
-    cutoff_next = cutoff_today + timedelta(days=1)
-
     now = timezone.now()
-    within_window = cutoff_today <= now < cutoff_next
+    cutoff_next = get_cutoff_datetime_for_date(prayer_log.date) + timedelta(days=1)
 
-    # Check token availability using the model's can_use_token method
-    can_use = streak.can_use_token()
-    has_tokens = can_use['allowed']
+    # Token eligibility: just check if tokens available, not cooldown/consumption rules
+    # Recovery eligibility ≠ token consumption eligibility
+    has_tokens = streak.protector_tokens > 0
 
-    # Protection only when within window AND has tokens
-    is_protected = within_window and has_tokens
+    result = {}
+    for key in prayer_keys:
+        status = getattr(prayer_log, f'{key}_status')
+        if status == 'missed':
+            within_window = now < cutoff_next
+            is_protected = within_window and has_tokens
 
-    if is_protected:
-        return {
-            'is_protected': True,
-            'expires_at': cutoff_next.isoformat(),
-            'requires_qada': True,
-        }
+            if is_protected:
+                result[key] = {
+                    'is_protected': True,
+                    'expires_at': cutoff_next.isoformat(),
+                    'requires_qada': True,
+                }
+            else:
+                result[key] = {
+                    'is_protected': False,
+                    'expires_at': cutoff_next.isoformat() if within_window else None,
+                    'requires_qada': False,
+                }
+        else:
+            result[key] = {
+                'is_protected': False,
+                'expires_at': None,
+                'requires_qada': False,
+            }
 
-    return {
-        'is_protected': False,
-        'expires_at': cutoff_next.isoformat() if within_window else None,
-        'requires_qada': False,
-    }
+    return result
 
 
 def attach_recovery_to_logs(logs, user):
