@@ -137,24 +137,16 @@ class LogoutView(generics.GenericAPIView):
     def post(self, request):
         try:
             refresh_token = request.data.get("refresh")
-            if not refresh_token:
-                return Response(
-                    {"error": "Refresh token is required to logout"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-            return Response({"success": True}, status=status.HTTP_205_RESET_CONTENT)
-        except TokenError as e:
-            return Response(
-                {"error": f"Invalid or expired token: {str(e)}"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            if refresh_token:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+        except TokenError:
+            pass  # Token is invalid or expired, best effort cleanup complete
         except Exception as e:
-            return Response(
-                {"error": "An unexpected error occurred during logout"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            pass  # Unexpected errors shouldn't crash the logout flow
+
+        # Always return success because logout is best-effort
+        return Response({"success": True}, status=status.HTTP_205_RESET_CONTENT)
 
 
 @api_view(['GET', 'PUT'])
