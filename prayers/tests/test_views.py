@@ -109,7 +109,7 @@ class TestDayRollover:
 
     def test_get_effective_today_returns_current_date(self):
         """get_effective_today should return the current date (midnight rollover)."""
-        from prayers.views import get_effective_today
+        from prayers.utils.time_utils import get_effective_today
         from django.utils import timezone
 
         effective_today = get_effective_today()

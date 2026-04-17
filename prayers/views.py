@@ -7,12 +7,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import DailyPrayerLog, Streak, UserSettings
 from .serializers import RegisterSerializer, DailyPrayerLogSerializer, StreakSerializer, UserProfileSerializer, UserSettingsSerializer
 
-def get_effective_today():
-    """
-    Returns the effective date for prayer logging.
-    Uses midnight rollover to match frontend behavior.
-    """
-    return timezone.localtime().date()
+from prayers.utils.time_utils import get_effective_today
 
 
 class RegisterView(generics.CreateAPIView):
@@ -35,7 +30,6 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 def profile_offsets_view(request):
     """
     PATCH /api/profile/offsets/ — Update calculation settings (manual_offsets, method, hanafi).
-    Also accepts intent_level for behavior configuration (Phase 3.1).
     EPIC 3: Cloud Sync for manual prayer time offsets.
     """
     settings_obj, _ = UserSettings.objects.get_or_create(user=request.user)
@@ -43,7 +37,6 @@ def profile_offsets_view(request):
     manual_offsets = request.data.get('manual_offsets')
     calculation_method = request.data.get('calculation_method')
     use_hanafi = request.data.get('use_hanafi')
-    intent_level = request.data.get('intent_level')
 
     if manual_offsets is not None:
         if not isinstance(manual_offsets, dict):
@@ -71,6 +64,20 @@ def profile_offsets_view(request):
     if use_hanafi is not None:
         settings_obj.use_hanafi = bool(use_hanafi)
 
+    settings_obj.save()
+    return Response(UserSettingsSerializer(settings_obj).data)
+
+
+@api_view(['PATCH'])
+@permission_classes([permissions.IsAuthenticated])
+def update_intent_view(request):
+    """
+    PATCH /api/user/intent/ — Update user's intent level.
+    Phase 3.1: Intent-driven UX configuration.
+    """
+    settings_obj, _ = UserSettings.objects.get_or_create(user=request.user)
+    intent_level = request.data.get('intent_level')
+
     if intent_level is not None:
         valid_intents = {'foundation', 'strengthening', 'growth'}
         if intent_level not in valid_intents:
@@ -79,9 +86,13 @@ def profile_offsets_view(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         settings_obj.intent_level = intent_level
-
-    settings_obj.save()
-    return Response(UserSettingsSerializer(settings_obj).data)
+        settings_obj.save()
+        return Response(UserSettingsSerializer(settings_obj).data)
+        
+    return Response(
+        {'error': 'intent_level is required'},
+        status=status.HTTP_400_BAD_REQUEST,
+    )
 
 
 @api_view(['GET'])

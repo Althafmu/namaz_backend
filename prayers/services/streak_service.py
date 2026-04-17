@@ -12,7 +12,7 @@ from datetime import timedelta
 
 from django.utils import timezone
 
-from prayers.views import get_effective_today
+from prayers.utils.time_utils import get_effective_today
 
 
 def get_cutoff_for_date(target_date):

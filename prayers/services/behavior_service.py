@@ -12,27 +12,12 @@ def get_user_behavior_config(user):
     except UserSettings.DoesNotExist:
         intent = 'foundation'
 
-    messaging_styles = {
-        'foundation': {
-            'style': 'soft',
-            'pre_miss_nudge': "Don't forget your {prayer} — take a moment for it",
-            'post_miss_encouragement': "It's okay. Recovery is always available.",
-            'streak_break_message': "Start again today. Stay consistent.",
-        },
-        'strengthening': {
-            'style': 'balanced',
-            'pre_miss_nudge': "Your {prayer} time — stay consistent",
-            'post_miss_encouragement': "Every prayer counts. Make it up within 24 hours.",
-            'streak_break_message': "You broke your streak. Recovery window available.",
-        },
-        'growth': {
-            'style': 'direct',
-            'pre_miss_nudge': "{prayer} time now",
-            'post_miss_encouragement': "Prioritize your prayers. Recovery window is limited.",
-            'streak_break_message': "Streak broken. Focus on getting back on track.",
-        },
+    styles = {
+        'foundation': 'soft',
+        'strengthening': 'balanced',
+        'growth': 'direct',
     }
-
+    
     nudge_intensities = {
         'foundation': 'light',
         'strengthening': 'medium',
@@ -41,24 +26,10 @@ def get_user_behavior_config(user):
 
     return {
         'intent': intent,
-        'messaging_style': messaging_styles.get(intent, messaging_styles['foundation']),
+        'style': styles.get(intent, 'soft'),
         'nudge_intensity': nudge_intensities.get(intent, 'medium'),
-        'flexible_recovery': {
-            'allowed_choices': _get_recovery_choices_for_intent(intent),
-        },
+        'flexible_recovery': intent == 'foundation',
     }
-
-
-def _get_recovery_choices_for_intent(intent):
-    """
-    Returns the list of prayers available for Qada recovery based on intent level.
-    Foundation: all missed prayers available
-    Others: only priority prayer (first missed in priority order)
-    """
-    if intent == 'foundation':
-        return ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']
-
-    return ['Fajr']
 
 
 def get_allowed_recovery_choices(user, missed_prayers):
@@ -68,7 +39,7 @@ def get_allowed_recovery_choices(user, missed_prayers):
 
     Args:
         user: Django User instance
-        missed_prayers: list of prayer names that were missed (e.g., ['Fajr', 'Asr'])
+        missed_prayers: list of prayer names that were missed (e.g., ['fajr', 'asr'])
 
     Returns:
         list of prayer names available for recovery selection
@@ -82,7 +53,7 @@ def get_allowed_recovery_choices(user, missed_prayers):
     if intent == 'foundation':
         return missed_prayers
 
-    priority_order = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']
+    priority_order = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
     for prayer in priority_order:
         if prayer in missed_prayers:
             return [prayer]
