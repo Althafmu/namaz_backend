@@ -79,6 +79,9 @@ def update_intent_view(request):
     intent_level = request.data.get('intent_level')
 
     if intent_level is not None:
+        if isinstance(intent_level, str):
+            intent_level = intent_level.strip().lower()
+
         valid_intents = {'foundation', 'strengthening', 'growth'}
         if intent_level not in valid_intents:
             return Response(
@@ -87,10 +90,13 @@ def update_intent_view(request):
             )
         settings_obj.intent_level = intent_level
         settings_obj.save()
-        return Response(UserSettingsSerializer(settings_obj).data)
+        return Response({
+            'success': True,
+            'data': UserSettingsSerializer(settings_obj).data
+        })
         
     return Response(
-        {'error': 'intent_level is required'},
+        {'success': False, 'error': 'intent_level is required'},
         status=status.HTTP_400_BAD_REQUEST,
     )
 
