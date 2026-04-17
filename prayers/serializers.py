@@ -17,7 +17,7 @@ class UserSettingsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserSettings
-        fields = ('manual_offsets', 'calculation_method', 'use_hanafi')
+        fields = ('manual_offsets', 'calculation_method', 'use_hanafi', 'intent_level')
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):

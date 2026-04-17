@@ -26,6 +26,11 @@ class UserSettings(models.Model):
         default=False,
         help_text='Whether to use Hanafi madhab for Asr calculation',
     )
+    intent_level = models.CharField(
+        max_length=20,
+        default='foundation',
+        choices=[('foundation', 'Foundation'), ('strengthening', 'Strengthening'), ('growth', 'Growth')],
+    )
 
     def __str__(self):
         return f'Settings for {self.user.username}'

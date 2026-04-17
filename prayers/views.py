@@ -35,6 +35,7 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 def profile_offsets_view(request):
     """
     PATCH /api/profile/offsets/ — Update calculation settings (manual_offsets, method, hanafi).
+    Also accepts intent_level for behavior configuration (Phase 3.1).
     EPIC 3: Cloud Sync for manual prayer time offsets.
     """
     settings_obj, _ = UserSettings.objects.get_or_create(user=request.user)
@@ -42,6 +43,7 @@ def profile_offsets_view(request):
     manual_offsets = request.data.get('manual_offsets')
     calculation_method = request.data.get('calculation_method')
     use_hanafi = request.data.get('use_hanafi')
+    intent_level = request.data.get('intent_level')
 
     if manual_offsets is not None:
         if not isinstance(manual_offsets, dict):
@@ -49,7 +51,6 @@ def profile_offsets_view(request):
                 {'error': 'manual_offsets must be a JSON object'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        # Validate offset keys and values
         valid_keys = {'Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'}
         for key, value in manual_offsets.items():
             if key not in valid_keys:
@@ -70,8 +71,30 @@ def profile_offsets_view(request):
     if use_hanafi is not None:
         settings_obj.use_hanafi = bool(use_hanafi)
 
+    if intent_level is not None:
+        valid_intents = {'foundation', 'strengthening', 'growth'}
+        if intent_level not in valid_intents:
+            return Response(
+                {'error': f'Invalid intent_level. Must be one of: {valid_intents}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        settings_obj.intent_level = intent_level
+
     settings_obj.save()
     return Response(UserSettingsSerializer(settings_obj).data)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def user_behavior_config_view(request):
+    """
+    GET /api/user/config/ — Returns behavioral configuration for the user.
+    Phase 3.1: Intent-driven UX configuration (messaging style, nudge intensity, recovery choices).
+    """
+    from prayers.services.behavior_service import get_user_behavior_config
+
+    config = get_user_behavior_config(request.user)
+    return Response(config)
 
 
 class DeleteAccountView(generics.DestroyAPIView):

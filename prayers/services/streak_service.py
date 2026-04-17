@@ -12,6 +12,8 @@ from datetime import timedelta
 
 from django.utils import timezone
 
+from prayers.views import get_effective_today
+
 
 def get_cutoff_for_date(target_date):
     """
@@ -52,7 +54,12 @@ def get_recovery_status(prayer_log, streak):
     and serializer (to read pre-computed value).
     """
     if prayer_log is None or streak is None:
-        return {k: {'is_protected': False, 'expires_at': None, 'requires_qada': False}
+        return {k: {'is_protected': False, 'expires_at': None, 'requires_qada': False, 'is_expired': False}
+                for k in ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']}
+
+    # Phase 3: Cross-day constraint — recovery only for current day (no cross-day ambiguity)
+    if prayer_log.date != get_effective_today():
+        return {k: {'is_protected': False, 'expires_at': None, 'requires_qada': False, 'is_expired': False}
                 for k in ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']}
 
     prayer_keys = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
@@ -64,35 +71,47 @@ def get_recovery_status(prayer_log, streak):
     has_tokens = streak.protector_tokens > 0
 
     result = {}
-    # Only protect the LATEST missed prayer (token economy: one token = one prayer)
-    # Prayer order: fajr < dhuhr < asr < maghrib < isha
+    # Phase 3: Priority recovery — protect highest-priority missed prayer (Fajr first)
+    # Prevents wrong allocation when multiple prayers are missed
     missed_prayers = [key for key in prayer_keys
                       if getattr(prayer_log, f'{key}_status') == 'missed']
-    latest_missed = missed_prayers[-1] if missed_prayers else None
+    priority_order = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
+    priority_missed = [p for p in priority_order if p in missed_prayers]
+    target_prayer = priority_missed[0] if priority_missed else None
 
     for key in prayer_keys:
         status = getattr(prayer_log, f'{key}_status')
         if status == 'missed':
             within_window = now < cutoff_next
-            is_protected = (key == latest_missed) and within_window and has_tokens
+            is_protected = (key == target_prayer) and within_window and has_tokens
 
             if is_protected:
                 result[key] = {
                     'is_protected': True,
                     'expires_at': cutoff_next.isoformat(),
                     'requires_qada': True,
+                    'is_expired': False,
+                }
+            elif not within_window:
+                result[key] = {
+                    'is_protected': False,
+                    'expires_at': None,
+                    'requires_qada': False,
+                    'is_expired': True,
                 }
             else:
                 result[key] = {
                     'is_protected': False,
                     'expires_at': None,
                     'requires_qada': False,
+                    'is_expired': False,
                 }
         else:
             result[key] = {
                 'is_protected': False,
                 'expires_at': None,
                 'requires_qada': False,
+                'is_expired': False,
             }
 
     return result
