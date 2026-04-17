@@ -3,6 +3,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.utils import timezone
 from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import DailyPrayerLog, Streak, UserSettings
 from .serializers import RegisterSerializer, DailyPrayerLogSerializer, StreakSerializer, UserProfileSerializer, UserSettingsSerializer
@@ -126,6 +127,28 @@ class DeleteAccountView(generics.DestroyAPIView):
             {'message': f'Account "{username}" has been permanently deleted.'},
             status=status.HTTP_204_NO_CONTENT,
         )
+
+
+class LogoutView(generics.GenericAPIView):
+    """POST /api/auth/logout/ — Logout and blacklist the refresh token."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        try:
+            refresh_token = request.data.get("refresh")
+            if not refresh_token:
+                return Response(
+                    {"error": "Refresh token is required to logout"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response(status=status.HTTP_205_RESET_CONTENT)
+        except Exception as e:
+            return Response(
+                {"error": "Invalid token or token already blacklisted"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 @api_view(['GET', 'PUT'])
