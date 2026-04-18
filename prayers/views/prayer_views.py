@@ -52,6 +52,7 @@ def _resolve_status(prayer_name, completed, request):
             return status_lower
         if status_lower in {'excused', 'pending'}:
             return status_lower
+        raise ValueError("Invalid status. Must be one of: ['on_time', 'late', 'missed', 'qada', 'excused', 'pending']")
     return canonical_to_db(CanonicalPrayerStatus.ONTIME)
 
 

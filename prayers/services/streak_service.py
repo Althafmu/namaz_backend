@@ -127,18 +127,17 @@ def attach_recovery_to_logs(logs, user):
 
 
 def _apply_weekly_reset(streak, today):
+    if streak.tokens_reset_date is None:
+        streak.tokens_reset_date = streak._current_week_start(today)
+        return
     if streak._is_new_week(streak.tokens_reset_date):
         streak.weekly_tokens_used = 0
         streak.tokens_reset_date = streak._current_week_start(today)
+        streak.protector_tokens = streak.MAX_PROTECTOR_TOKENS
 
 
 def _full_recalculate(streak, force=False):
     today = timezone.localdate()
-
-    if not force and streak.last_recalculated_at:
-        last_calc_date = timezone.localtime(streak.last_recalculated_at).date()
-        if last_calc_date == today:
-            return {"mode": "skipped", "processed_logs": 0}
 
     _apply_weekly_reset(streak, today)
 
@@ -182,7 +181,7 @@ def _full_recalculate(streak, force=False):
 
     longest = max(longest, current_chain_count)
 
-    if chain_is_alive and previous_date and (today - previous_date).days <= 1:
+    if chain_is_alive and previous_date == today:
         current = current_chain_count
 
     streak.current_streak = current
@@ -238,7 +237,7 @@ def _incremental_recalculate_recent(streak, changed_date):
                 last_completed = log.date
         previous_date = log.date
 
-    current = current_chain_count if chain_is_alive else 0
+    current = current_chain_count if chain_is_alive and previous_date == today else 0
     streak.current_streak = current
     streak.longest_streak = max(streak.longest_streak, current)
     streak.last_completed_date = last_completed

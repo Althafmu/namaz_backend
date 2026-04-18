@@ -115,7 +115,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # CORS — strict allowlist in production
 cors_origins_raw = os.environ.get('CORS_ALLOWED_ORIGINS', '')
 cors_origins = [origin.strip() for origin in cors_origins_raw.split(',') if origin.strip()]
-if DEBUG:
+is_production_env = bool(os.environ.get('RENDER') or os.environ.get('RAILWAY_ENVIRONMENT'))
+if DEBUG or not is_production_env:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
     if not cors_origins:
@@ -144,7 +145,7 @@ REST_FRAMEWORK = {
     },
 }
 
-if not DEBUG:
+if is_production_env:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True

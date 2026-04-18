@@ -55,7 +55,7 @@ def consume_protector_token(request):
 
     try:
         log = DailyPrayerLog.objects.get(user=request.user, date=target_date)
-        if log.is_valid_for_streak:
+        if log.is_valid_for_streak or log.is_complete:
             return error_response(
                 "DATE_ALREADY_VALID",
                 f'Date {target_date} is already valid for streak. No token needed.',
@@ -77,4 +77,3 @@ def consume_protector_token(request):
         'weekly_tokens_remaining': streak.WEEKLY_TOKEN_LIMIT - streak.weekly_tokens_used,
         'streak': StreakSerializer(streak).data,
     })
-
