@@ -68,3 +68,7 @@ coverage.xml
 
 # mypy
 .mypy_cache/
+
+# Generated artifacts
+diff_output.txt
+test_results.txt

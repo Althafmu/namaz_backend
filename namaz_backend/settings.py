@@ -90,7 +90,7 @@ DATABASES = {
     'default': dj_database_url.config(
         default=f'sqlite:///{BASE_DIR}/db.sqlite3',
         conn_max_age=600,
-        ssl_require=not DEBUG
+        ssl_require=(not DEBUG and bool(os.environ.get('DATABASE_URL')))
     )
 }
 AUTH_PASSWORD_VALIDATORS = [
@@ -112,22 +112,16 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS — open in dev, locked to specified origin in prod
-cors_origin = os.environ.get('CORS_ALLOWED_ORIGIN')
-
-if DEBUG or not cors_origin:
-    # Development or no CORS configured: allow all origins
+# CORS — strict allowlist in production
+cors_origins_raw = os.environ.get('CORS_ALLOWED_ORIGINS', '')
+cors_origins = [origin.strip() for origin in cors_origins_raw.split(',') if origin.strip()]
+if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
-    if not DEBUG and not cors_origin:
-        warnings.warn(
-            'CORS_ALLOWED_ORIGIN not set. All origins are allowed. '
-            'Set CORS_ALLOWED_ORIGIN for production.',
-            UserWarning
-        )
 else:
-    # Production with explicit CORS: lock to specified origin
+    if not cors_origins:
+        raise ImproperlyConfigured('CORS_ALLOWED_ORIGINS is required in production.')
     CORS_ALLOW_ALL_ORIGINS = False
-    CORS_ALLOWED_ORIGINS = [cors_origin]
+    CORS_ALLOWED_ORIGINS = cors_origins
 
 # Django REST Framework
 REST_FRAMEWORK = {
@@ -137,6 +131,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'EXCEPTION_HANDLER': 'prayers.utils.exception_handler.api_exception_handler',
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
@@ -144,8 +139,19 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '10/minute',
         'user': '60/minute',
+        'register': '5/minute',
+        'prayer_log': '30/minute',
     },
 }
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000'))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 
 # Simple JWT
 AUTHENTICATION_BACKENDS = [
