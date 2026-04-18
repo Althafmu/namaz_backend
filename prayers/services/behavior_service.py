@@ -1,4 +1,4 @@
-from .models import UserSettings
+from prayers.models import UserSettings
 
 
 def get_user_behavior_config(user):

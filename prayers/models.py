@@ -4,6 +4,8 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+from prayers.services.status_service import is_completion_status_db
+
 
 class UserSettings(models.Model):
     """Stores per-user calculation settings for cloud sync (EPIC 3)."""
@@ -30,6 +32,11 @@ class UserSettings(models.Model):
         max_length=20,
         default='foundation',
         choices=[('foundation', 'Foundation'), ('strengthening', 'Strengthening'), ('growth', 'Growth')],
+    )
+    pause_notifications_until = models.DateField(
+        null=True,
+        blank=True,
+        help_text='If set to today, notifications are paused until end of day.',
     )
 
     def __str__(self):
@@ -99,6 +106,9 @@ class DailyPrayerLog(models.Model):
     class Meta:
         unique_together = ('user', 'date')
         ordering = ['-date']
+        indexes = [
+            models.Index(fields=['user', 'created_at'], name='prayerlog_user_created_idx'),
+        ]
 
     def __str__(self):
         completed = sum([self.fajr, self.dhuhr, self.asr, self.maghrib, self.isha])
@@ -156,10 +166,8 @@ class DailyPrayerLog(models.Model):
         """
         if self.is_fully_excused:
             return False
-
-        valid_statuses = {'on_time', 'late', 'qada'}
         return all(
-            completed and status in valid_statuses
+            completed and is_completion_status_db(status)
             for completed, status in zip(self.prayer_completed, self.prayer_statuses)
         )
 
@@ -225,7 +233,7 @@ class Streak(models.Model):
         current_week_start = self._current_week_start(today)
         return current_week_start > last_reset_date
 
-    def recalculate(self, force=False):
+    def recalculate(self, force=False, changed_date=None):
         """
         Recalculate streak data.
 
@@ -234,67 +242,8 @@ class Streak(models.Model):
         Recovery (protection) window: if a missed day has active protection, the chain
         stays alive so the user can still log Qada before the window closes.
         """
-        from prayers.services.streak_service import get_recovery_status
-
-        today = timezone.localdate()
-
-        if not force and self.last_recalculated_at:
-            last_calc_date = timezone.localtime(self.last_recalculated_at).date()
-            if last_calc_date == today:
-                return
-
-        # Sprint 1: Sunday-based weekly reset for tokens (PRD)
-        if self._is_new_week(self.tokens_reset_date):
-            self.weekly_tokens_used = 0
-            self.tokens_reset_date = self._current_week_start(today)
-
-        current = 0
-        longest = 0
-        last_completed = None
-        current_chain_count = 0
-        previous_date = None
-        chain_is_alive = False
-
-        logs = DailyPrayerLog.objects.filter(user=self.user).order_by('date')
-        for log in logs:
-            if previous_date and (log.date - previous_date).days > 1:
-                longest = max(longest, current_chain_count)
-                current_chain_count = 0
-                chain_is_alive = False
-
-            if not log.is_valid_for_streak:
-                # Check if protection is still active — chain survives during window
-                recovery = get_recovery_status(log, self)
-                any_protected = any(v['is_protected'] for v in recovery.values())
-                if any_protected:
-                    # Protection active: preserve chain continuity, don't increment
-                    chain_is_alive = True
-                    previous_date = log.date
-                    continue
-                # Protection expired: break streak
-                longest = max(longest, current_chain_count)
-                current_chain_count = 0
-                chain_is_alive = False
-                previous_date = log.date
-                continue
-
-            chain_is_alive = True
-            if log.counts_toward_streak_increment:
-                current_chain_count += 1
-                last_completed = log.date
-
-            previous_date = log.date
-
-        longest = max(longest, current_chain_count)
-
-        if chain_is_alive and previous_date and (today - previous_date).days <= 1:
-            current = current_chain_count
-
-        self.current_streak = current
-        self.longest_streak = longest
-        self.last_completed_date = last_completed
-        self.last_recalculated_at = timezone.now()
-        self.save()
+        from prayers.services.streak_service import recalculate_streak
+        recalculate_streak(self, force=force, changed_date=changed_date)
 
     def can_use_token(self, target_date=None):
         """

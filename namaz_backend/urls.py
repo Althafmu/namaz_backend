@@ -3,7 +3,8 @@ from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework.throttling import AnonRateThrottle
 from prayers.serializers import CustomTokenObtainPairSerializer
-from prayers.views import ProfileView, DeleteAccountView, profile_offsets_view, LogoutView
+from prayers.views.auth_views import ProfileView, DeleteAccountView, LogoutView
+from prayers.views.settings_views import profile_offsets_view
 
 class LoginRateThrottle(AnonRateThrottle):
     rate = '5/minute'
