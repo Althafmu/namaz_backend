@@ -23,19 +23,13 @@ def consume_protector_token(request):
     streak, _ = Streak.objects.get_or_create(user=request.user)
     can_use = streak.can_use_token()
     if not can_use['allowed']:
-        return error_response(
-            "TOKEN_NOT_ALLOWED",
-            can_use['reason'],
-            status.HTTP_400_BAD_REQUEST,
-            extra={'streak': StreakSerializer(streak).data},
-        )
+        response = error_response("TOKEN_NOT_ALLOWED", can_use['reason'], status.HTTP_400_BAD_REQUEST)
+        response.data["streak"] = StreakSerializer(streak).data
+        return response
     if streak.protector_tokens <= 0:
-        return error_response(
-            "NO_TOKENS_AVAILABLE",
-            'No protector tokens available. Tokens reset every Sunday.',
-            status.HTTP_400_BAD_REQUEST,
-            extra={'streak': StreakSerializer(streak).data},
-        )
+        response = error_response("NO_TOKENS_AVAILABLE", 'No protector tokens available. Tokens reset every Sunday.', status.HTTP_400_BAD_REQUEST)
+        response.data["streak"] = StreakSerializer(streak).data
+        return response
 
     today = get_effective_today()
     date_str = request.data.get('date')
@@ -56,12 +50,13 @@ def consume_protector_token(request):
     try:
         log = DailyPrayerLog.objects.get(user=request.user, date=target_date)
         if log.is_valid_for_streak or log.is_complete:
-            return error_response(
+            response = error_response(
                 "DATE_ALREADY_VALID",
-                f'Date {target_date} is already valid for streak. No token needed.',
+                f'Date {target_date} is already valid for streak (complete/valid). No token needed.',
                 status.HTTP_400_BAD_REQUEST,
-                extra={'streak': StreakSerializer(streak).data},
             )
+            response.data["streak"] = StreakSerializer(streak).data
+            return response
     except DailyPrayerLog.DoesNotExist:
         return error_response(
             "LOG_NOT_FOUND",

@@ -297,17 +297,17 @@ def analytics_view(request):
     excused_count = 0
     for log in logs:
         for prayer in ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']:
-            prayer_status = getattr(log, f'{prayer}_status')
+            current_prayer_status = getattr(log, f'{prayer}_status')
             completed = getattr(log, prayer)
-            if prayer_status == 'excused':
+            if current_prayer_status == 'excused':
                 counts[prayer] += 1
                 excused_count += 1
                 total_valid += 1
             elif completed:
                 counts[prayer] += 1
                 total_valid += 1
-                if prayer_status in counts:
-                    counts[prayer_status] += 1
+                if current_prayer_status in counts:
+                    counts[current_prayer_status] += 1
     return Response({**counts, 'total_valid': total_valid, 'excused_count': excused_count})
 
 

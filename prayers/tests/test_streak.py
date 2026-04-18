@@ -39,10 +39,12 @@ class TestStreakRecalculation:
         yesterday = date.today() - timedelta(days=1)
         create_completed_log(user, yesterday)
 
+        # Current streak now reflects only a still-alive chain ending today.
         streak.recalculate()
         assert streak.current_streak == 0
 
         # Miss today - streak should be 0
+        # With no log for today yet, current streak remains 0.
         streak.recalculate()
         assert streak.current_streak == 0
 

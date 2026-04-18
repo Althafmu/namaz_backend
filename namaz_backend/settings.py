@@ -90,6 +90,7 @@ DATABASES = {
     'default': dj_database_url.config(
         default=f'sqlite:///{BASE_DIR}/db.sqlite3',
         conn_max_age=600,
+        # SQLite does not support sslmode; only enforce ssl when DATABASE_URL is used.
         ssl_require=(not DEBUG and bool(os.environ.get('DATABASE_URL')))
     )
 }
@@ -146,11 +147,15 @@ REST_FRAMEWORK = {
 }
 
 if is_production_env:
+    try:
+        hsts_seconds = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000'))
+    except ValueError:
+        hsts_seconds = 31536000
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000'))
+    SECURE_HSTS_SECONDS = hsts_seconds
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
