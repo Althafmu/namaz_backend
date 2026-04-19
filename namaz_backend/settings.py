@@ -121,10 +121,15 @@ is_production_env = bool(os.environ.get('RENDER') or os.environ.get('RAILWAY_ENV
 if DEBUG or not is_production_env:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
-    if not cors_origins:
-        raise ImproperlyConfigured('CORS_ALLOWED_ORIGINS is required in production.')
     CORS_ALLOW_ALL_ORIGINS = False
-    CORS_ALLOWED_ORIGINS = cors_origins
+    if cors_origins:
+        CORS_ALLOWED_ORIGINS = cors_origins
+    else:
+        warnings.warn(
+            'CORS_ALLOWED_ORIGINS is not set in production. Browser-based cross-origin '
+            'requests will be blocked until allowed origins are configured.',
+            UserWarning,
+        )
 
 # Django REST Framework
 REST_FRAMEWORK = {
