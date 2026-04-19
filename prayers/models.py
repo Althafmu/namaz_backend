@@ -33,6 +33,10 @@ class UserSettings(models.Model):
         default='foundation',
         choices=[('foundation', 'Foundation'), ('strengthening', 'Strengthening'), ('growth', 'Growth')],
     )
+    intent_explicitly_set = models.BooleanField(
+        default=False,
+        help_text='Whether the user explicitly chose an intent level in onboarding.',
+    )
     pause_notifications_until = models.DateField(
         null=True,
         blank=True,

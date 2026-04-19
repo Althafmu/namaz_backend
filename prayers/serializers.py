@@ -22,6 +22,7 @@ class UserSettingsSerializer(serializers.ModelSerializer):
             'calculation_method',
             'use_hanafi',
             'intent_level',
+            'intent_explicitly_set',
             'pause_notifications_until',
             'sunnah_enabled',
         )

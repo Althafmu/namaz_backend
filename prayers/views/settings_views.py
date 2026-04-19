@@ -15,6 +15,7 @@ def profile_offsets_view(request):
     manual_offsets = request.data.get('manual_offsets')
     calculation_method = request.data.get('calculation_method')
     use_hanafi = request.data.get('use_hanafi')
+    intent_level = request.data.get('intent_level')
     sunnah_enabled = request.data.get('sunnah_enabled')
 
     if manual_offsets is not None:
@@ -33,6 +34,19 @@ def profile_offsets_view(request):
 
     if use_hanafi is not None:
         settings_obj.use_hanafi = bool(use_hanafi)
+
+    if intent_level is not None:
+        if isinstance(intent_level, str):
+            intent_level = intent_level.strip().lower()
+        valid_intents = {'foundation', 'strengthening', 'growth'}
+        if intent_level not in valid_intents:
+            return error_response(
+                "INVALID_INTENT_LEVEL",
+                f'Invalid intent_level. Must be one of: {valid_intents}',
+                status.HTTP_400_BAD_REQUEST,
+            )
+        settings_obj.intent_level = intent_level
+        settings_obj.intent_explicitly_set = True
 
     if sunnah_enabled is not None:
         settings_obj.sunnah_enabled = bool(sunnah_enabled)
@@ -57,6 +71,7 @@ def update_intent_view(request):
                 status.HTTP_400_BAD_REQUEST,
             )
         settings_obj.intent_level = intent_level
+        settings_obj.intent_explicitly_set = True
         settings_obj.save()
         return Response({'success': True, 'data': UserSettingsSerializer(settings_obj).data})
     return error_response("MISSING_INTENT_LEVEL", "intent_level is required", status.HTTP_400_BAD_REQUEST)
