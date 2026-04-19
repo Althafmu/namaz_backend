@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'corsheaders',
     # Local
     'prayers',
+    'sunnah',
 ]
 
 MIDDLEWARE = [

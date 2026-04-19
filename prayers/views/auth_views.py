@@ -50,16 +50,27 @@ class DeleteAccountView(generics.DestroyAPIView):
 
 
 class LogoutView(generics.GenericAPIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
+        refresh_token = request.data.get("refresh")
+        if not refresh_token:
+            return Response(
+                {"error": "refresh token is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
-            refresh_token = request.data.get("refresh")
-            if refresh_token:
-                token = RefreshToken(refresh_token)
-                token.blacklist()
+            token = RefreshToken(refresh_token)
+            token.blacklist()
         except TokenError:
-            pass
+            return Response(
+                {"error": "Invalid or expired refresh token"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except Exception:
-            pass
+            return Response(
+                {"error": "Logout failed"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
         return Response({"success": True}, status=status.HTTP_205_RESET_CONTENT)

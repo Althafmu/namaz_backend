@@ -311,24 +311,54 @@ def analytics_view(request):
     return Response({**counts, 'total_valid': total_valid, 'excused_count': excused_count})
 
 
+def _infer_undo_prayer_name(log):
+    """Best-effort fallback for legacy undo calls without prayer/date payload."""
+    # Reverse chronological prayer order for a typical day.
+    for prayer in ['isha', 'maghrib', 'asr', 'dhuhr', 'fajr']:
+        if getattr(log, prayer):
+            return prayer
+    return None
+
+
 @api_view(['POST'])
 def undo_last_prayer_action(request):
-    prayer_name = request.data.get('prayer', '').lower()
+    prayer_name = str(request.data.get('prayer', '')).strip().lower()
     date_str = request.data.get('date')
     valid_prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
-    if prayer_name not in valid_prayers:
-        return error_response("INVALID_PRAYER_NAME", f'Invalid prayer name. Must be one of: {valid_prayers}', status.HTTP_400_BAD_REQUEST)
-    if not date_str:
-        return error_response("MISSING_DATE", "date is required. Format: YYYY-MM-DD", status.HTTP_400_BAD_REQUEST)
-    try:
-        target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-    except ValueError:
-        return error_response("INVALID_DATE_FORMAT", "Invalid date format. Expected YYYY-MM-DD.", status.HTTP_400_BAD_REQUEST)
+
+    if date_str:
+        try:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return error_response("INVALID_DATE_FORMAT", "Invalid date format. Expected YYYY-MM-DD.", status.HTTP_400_BAD_REQUEST)
+    else:
+        # Legacy fallback: default to today when date is omitted.
+        target_date = get_effective_today()
 
     try:
         log = DailyPrayerLog.objects.get(user=request.user, date=target_date)
     except DailyPrayerLog.DoesNotExist:
         return error_response("LOG_NOT_FOUND", f"No prayer log found for {target_date}.", status.HTTP_404_NOT_FOUND)
+
+    if prayer_name:
+        if prayer_name not in valid_prayers:
+            return error_response("INVALID_PRAYER_NAME", f'Invalid prayer name. Must be one of: {valid_prayers}', status.HTTP_400_BAD_REQUEST)
+    else:
+        # Legacy fallback: infer the latest completed prayer for the selected date.
+        prayer_name = _infer_undo_prayer_name(log)
+        if prayer_name is None:
+            return error_response(
+                "UNDO_NOT_AVAILABLE",
+                "No completed prayer found to undo for the selected date.",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+    if not getattr(log, prayer_name):
+        return error_response(
+            "UNDO_NOT_AVAILABLE",
+            f"{prayer_name.title()} is not marked as completed for {target_date}.",
+            status.HTTP_400_BAD_REQUEST,
+        )
 
     setattr(log, prayer_name, False)
     setattr(log, f"{prayer_name}_in_jamaat", False)

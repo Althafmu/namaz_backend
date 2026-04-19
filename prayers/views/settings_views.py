@@ -15,6 +15,7 @@ def profile_offsets_view(request):
     manual_offsets = request.data.get('manual_offsets')
     calculation_method = request.data.get('calculation_method')
     use_hanafi = request.data.get('use_hanafi')
+    sunnah_enabled = request.data.get('sunnah_enabled')
 
     if manual_offsets is not None:
         if not isinstance(manual_offsets, dict):
@@ -32,6 +33,9 @@ def profile_offsets_view(request):
 
     if use_hanafi is not None:
         settings_obj.use_hanafi = bool(use_hanafi)
+
+    if sunnah_enabled is not None:
+        settings_obj.sunnah_enabled = bool(sunnah_enabled)
 
     settings_obj.save()
     return Response(UserSettingsSerializer(settings_obj).data)
@@ -67,10 +71,23 @@ def user_behavior_config_view(request):
     return Response(config)
 
 
-@api_view(['POST'])
+@api_view(['GET', 'POST'])
 @permission_classes([permissions.IsAuthenticated])
 def pause_notifications_today_view(request):
     settings_obj, _ = UserSettings.objects.get_or_create(user=request.user)
-    settings_obj.pause_notifications_until = get_effective_today()
-    settings_obj.save(update_fields=['pause_notifications_until'])
-    return Response({"paused_until": settings_obj.pause_notifications_until.isoformat()})
+    today = get_effective_today()
+
+    if request.method == 'POST':
+        settings_obj.pause_notifications_until = today
+        settings_obj.save(update_fields=['pause_notifications_until'])
+
+    is_paused = settings_obj.pause_notifications_until == today
+    payload = {
+        "is_paused": is_paused,
+        "paused_until": settings_obj.pause_notifications_until.isoformat()
+        if settings_obj.pause_notifications_until
+        else None,
+    }
+    if request.method == 'POST':
+        payload["message"] = "Notifications paused for today"
+    return Response(payload)

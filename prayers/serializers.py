@@ -17,7 +17,14 @@ class UserSettingsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserSettings
-        fields = ('manual_offsets', 'calculation_method', 'use_hanafi', 'intent_level', 'pause_notifications_until')
+        fields = (
+            'manual_offsets',
+            'calculation_method',
+            'use_hanafi',
+            'intent_level',
+            'pause_notifications_until',
+            'sunnah_enabled',
+        )
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):

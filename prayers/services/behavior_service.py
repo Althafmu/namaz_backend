@@ -9,8 +9,10 @@ def get_user_behavior_config(user):
     try:
         settings = user.settings
         intent = settings.intent_level
+        sunnah_enabled = settings.sunnah_enabled
     except UserSettings.DoesNotExist:
         intent = 'foundation'
+        sunnah_enabled = False
 
     styles = {
         'foundation': 'soft',
@@ -29,4 +31,5 @@ def get_user_behavior_config(user):
         'style': styles.get(intent, 'soft'),
         'nudge_intensity': nudge_intensities.get(intent, 'medium'),
         'flexible_recovery': intent == 'foundation',
+        'sunnah_enabled': sunnah_enabled,
     }

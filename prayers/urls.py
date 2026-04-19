@@ -32,9 +32,15 @@ urlpatterns = [
     path('prayers/log/', log_single_prayer, name='log-single-prayer'),
     path('prayers/excused/', set_excused_day, name='set-excused-day'),
     path('prayers/log/undo/', undo_last_prayer_action, name='undo-last-prayer-action'),
+    # Backward-compatible alias used by older mobile clients.
+    path('prayers/undo/', undo_last_prayer_action, name='undo-last-prayer-action-legacy'),
     path('sync/status/', sync_status_view, name='sync-status'),
+    # Backward-compatible alias used by older mobile clients.
+    path('sync/metadata/', sync_status_view, name='sync-metadata-legacy'),
     path('analytics/weekly/', analytics_view, name='analytics-weekly'),
     path('streak/', streak_view, name='streak'),
     path('streak/consume-token/', consume_protector_token, name='consume-protector-token'),
     path('user/pause-notifications-today/', pause_notifications_today_view, name='pause-notifications-today'),
+    # Backward-compatible alias used by older mobile clients.
+    path('notifications/pause-today/', pause_notifications_today_view, name='pause-notifications-today-legacy'),
 ]

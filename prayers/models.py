@@ -38,6 +38,10 @@ class UserSettings(models.Model):
         blank=True,
         help_text='If set to today, notifications are paused until end of day.',
     )
+    sunnah_enabled = models.BooleanField(
+        default=False,
+        help_text='Whether optional Sunna tracking is enabled for this user.',
+    )
 
     def __str__(self):
         return f'Settings for {self.user.username}'

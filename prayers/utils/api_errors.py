@@ -25,7 +25,9 @@ ERROR_MESSAGES = {
     "NO_TOKENS_AVAILABLE": "No protector tokens available. Tokens reset every Sunday.",
     "TOKEN_WINDOW_EXCEEDED": "Can only consume token for today or yesterday (Qada must be within 24 hours).",
     "DATE_ALREADY_VALID": "Date is already valid for streak. No token needed.",
+    "UNDO_NOT_AVAILABLE": "No completed prayer found to undo for the selected date.",
     "LOG_NOT_FOUND": "No prayer log found for the requested date.",
+    "SUNNAH_GROWTH_REQUIRED": "Sunna tracking is only available for Growth intent level.",
 }
 
 
