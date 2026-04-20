@@ -6,6 +6,7 @@ from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from prayers.models import DailyPrayerLog, Streak
+from prayers.utils.time_utils import get_effective_today
 
 
 @pytest.mark.django_db
@@ -212,7 +213,7 @@ class TestSetExcusedDay:
     def test_set_excused_day_success(self):
         """Should mark all prayers as excused for a date."""
         self.setUp()
-        yesterday = date.today() - timedelta(days=1)
+        yesterday = get_effective_today() - timedelta(days=1)
 
         response = self.client.post('/api/prayers/excused/', {
             'date': yesterday.isoformat(),
@@ -231,7 +232,7 @@ class TestSetExcusedDay:
     def test_set_excused_day_future_limit(self):
         """Should fail for dates more than 7 days in future."""
         self.setUp()
-        future_date = date.today() + timedelta(days=8)
+        future_date = get_effective_today() + timedelta(days=8)
 
         response = self.client.post('/api/prayers/excused/', {
             'date': future_date.isoformat(),
@@ -243,7 +244,7 @@ class TestSetExcusedDay:
     def test_set_excused_day_past_limit(self):
         """Should fail for dates more than 30 days in past."""
         self.setUp()
-        past_date = date.today() - timedelta(days=31)
+        past_date = get_effective_today() - timedelta(days=31)
 
         response = self.client.post('/api/prayers/excused/', {
             'date': past_date.isoformat(),
@@ -264,7 +265,7 @@ class TestSetExcusedDay:
     def test_set_excused_day_marks_prayers_complete(self):
         """Should mark all prayers as complete (True) for streak purposes."""
         self.setUp()
-        yesterday = date.today() - timedelta(days=1)
+        yesterday = get_effective_today() - timedelta(days=1)
 
         response = self.client.post('/api/prayers/excused/', {
             'date': yesterday.isoformat(),
@@ -278,6 +279,64 @@ class TestSetExcusedDay:
         assert log.maghrib is True
         assert log.isha is True
         assert log.is_valid_for_streak is True
+
+
+@pytest.mark.django_db
+class TestClearExcusedDay:
+    """Tests for POST /api/prayers/excused/clear/ endpoint."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(username='clear_excused_user', password='testpass')
+        refresh = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+
+    def test_clear_excused_day_resets_only_excused_prayers(self):
+        """Should reset excused prayers to pending without touching other statuses."""
+        self.setUp()
+        target_date = date.today() - timedelta(days=1)
+        DailyPrayerLog.objects.create(
+            user=self.user,
+            date=target_date,
+            fajr=True,
+            fajr_status='excused',
+            fajr_reason='travel',
+            dhuhr=True,
+            dhuhr_status='on_time',
+            asr=True,
+            asr_status='excused',
+            asr_reason='travel',
+            maghrib=False,
+            maghrib_status='pending',
+            isha=True,
+            isha_status='qada',
+        )
+
+        response = self.client.post('/api/prayers/excused/clear/', {
+            'date': target_date.isoformat(),
+        })
+
+        assert response.status_code == 200
+        log = DailyPrayerLog.objects.get(user=self.user, date=target_date)
+        assert log.fajr is False
+        assert log.fajr_status == 'pending'
+        assert log.fajr_reason is None
+        assert log.asr is False
+        assert log.asr_status == 'pending'
+        assert log.asr_reason is None
+        assert log.dhuhr is True
+        assert log.dhuhr_status == 'on_time'
+        assert log.isha is True
+        assert log.isha_status == 'qada'
+
+    def test_clear_excused_day_requires_date(self):
+        """Should fail when date is not provided."""
+        self.setUp()
+
+        response = self.client.post('/api/prayers/excused/clear/', {})
+
+        assert response.status_code == 400
+        assert 'date is required' in response.data['error']
 
 
 @pytest.mark.django_db
@@ -301,7 +360,7 @@ class TestLogPrayerWithStatus:
         })
 
         assert response.status_code == 200
-        log = DailyPrayerLog.objects.get(user=self.user, date=date.today())
+        log = DailyPrayerLog.objects.get(user=self.user, date=get_effective_today())
         assert log.fajr_status == 'qada'
 
     def test_log_prayer_with_excused_status(self):
@@ -315,7 +374,7 @@ class TestLogPrayerWithStatus:
         })
 
         assert response.status_code == 200
-        log = DailyPrayerLog.objects.get(user=self.user, date=date.today())
+        log = DailyPrayerLog.objects.get(user=self.user, date=get_effective_today())
         assert log.fajr_status == 'excused'
 
     def test_log_prayer_with_invalid_status(self):
@@ -343,6 +402,6 @@ class TestLogPrayerWithStatus:
         })
 
         assert response.status_code == 200
-        log = DailyPrayerLog.objects.get(user=self.user, date=date.today())
+        log = DailyPrayerLog.objects.get(user=self.user, date=get_effective_today())
         assert log.fajr_status == 'late'
         assert log.fajr_reason == 'Work meeting ran late'

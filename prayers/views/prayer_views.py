@@ -287,6 +287,41 @@ def set_excused_day(request):
     return Response(DailyPrayerLogSerializer(log).data)
 
 
+@api_view(['POST'])
+def clear_excused_day(request):
+    date_str = request.data.get('date')
+    if not date_str:
+        return error_response("MISSING_DATE", "date is required. Format: YYYY-MM-DD", status.HTTP_400_BAD_REQUEST)
+
+    try:
+        target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return error_response("INVALID_DATE_FORMAT", "Invalid date format. Expected YYYY-MM-DD.", status.HTTP_400_BAD_REQUEST)
+
+    try:
+        log = DailyPrayerLog.objects.get(user=request.user, date=target_date)
+    except DailyPrayerLog.DoesNotExist:
+        log, _ = DailyPrayerLog.objects.get_or_create(user=request.user, date=target_date)
+
+    for prayer in ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']:
+        status_field = f'{prayer}_status'
+        reason_field = f'{prayer}_reason'
+        in_jamaat_field = f'{prayer}_in_jamaat'
+
+        if getattr(log, status_field) == 'excused':
+            setattr(log, prayer, False)
+            setattr(log, status_field, 'pending')
+            setattr(log, reason_field, None)
+            setattr(log, in_jamaat_field, False)
+
+    log.save()
+
+    streak, _ = Streak.objects.get_or_create(user=request.user)
+    streak.recalculate(force=False, changed_date=target_date)
+    attach_recovery_to_logs([log], request.user)
+    return Response(DailyPrayerLogSerializer(log).data)
+
+
 @api_view(['GET'])
 def analytics_view(request):
     today = get_effective_today()

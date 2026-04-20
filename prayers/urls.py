@@ -7,6 +7,7 @@ from prayers.views.prayer_views import (
     reason_summary,
     log_single_prayer,
     set_excused_day,
+    clear_excused_day,
     analytics_view,
     undo_last_prayer_action,
     sync_status_view,
@@ -31,6 +32,7 @@ urlpatterns = [
     path('prayers/reasons/', reason_summary, name='reason-summary'),
     path('prayers/log/', log_single_prayer, name='log-single-prayer'),
     path('prayers/excused/', set_excused_day, name='set-excused-day'),
+    path('prayers/excused/clear/', clear_excused_day, name='clear-excused-day'),
     path('prayers/log/undo/', undo_last_prayer_action, name='undo-last-prayer-action'),
     # Backward-compatible alias used by older mobile clients.
     path('prayers/undo/', undo_last_prayer_action, name='undo-last-prayer-action-legacy'),

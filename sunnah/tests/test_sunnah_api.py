@@ -49,14 +49,15 @@ class TestSunnahApi:
         SunnahLog.objects.create(user=self.user, date=today, prayer_type='fajr', completed=True)
         SunnahLog.objects.create(user=self.user, date=today, prayer_type='dhuhr', completed=True)
         SunnahLog.objects.create(user=self.user, date=today, prayer_type='asr', completed=False)
+        SunnahLog.objects.create(user=self.user, date=today, prayer_type='witr', completed=True)
 
         response = self.client.get(f'/api/v2/sunnah/daily/?date={today.isoformat()}')
 
         assert response.status_code == 200
-        assert response.data['completed_count'] == 2
-        assert response.data['total_opportunities'] == 5
-        assert response.data['completion_ratio'] == 0.4
-        assert set(response.data['prayer_types_completed']) == {'fajr', 'dhuhr'}
+        assert response.data['completed_count'] == 3
+        assert response.data['total_opportunities'] == 8
+        assert response.data['completion_ratio'] == pytest.approx(3 / 8)
+        assert set(response.data['prayer_types_completed']) == {'fajr', 'dhuhr', 'witr'}
 
     def test_weekly_summary(self):
         self.setUp()
@@ -64,15 +65,29 @@ class TestSunnahApi:
         sunday = today - timedelta(days=(today.weekday() + 1) % 7)
         SunnahLog.objects.create(user=self.user, date=sunday, prayer_type='fajr', completed=True)
         SunnahLog.objects.create(user=self.user, date=sunday + timedelta(days=1), prayer_type='isha', completed=True)
+        SunnahLog.objects.create(user=self.user, date=sunday + timedelta(days=2), prayer_type='dhuha', completed=True)
 
         response = self.client.get(f'/api/v2/sunnah/weekly/?start_date={sunday.isoformat()}')
 
         assert response.status_code == 200
         assert response.data['week_start'] == sunday.isoformat()
         assert len(response.data['days']) == 7
-        assert response.data['total_completed'] == 2
-        assert response.data['total_opportunities'] == 35
-        assert response.data['completion_ratio'] == pytest.approx(2 / 35)
+        assert response.data['total_completed'] == 3
+        assert response.data['total_opportunities'] == 56
+        assert response.data['completion_ratio'] == pytest.approx(3 / 56)
+
+    def test_log_extra_sunnah_type(self):
+        self.setUp()
+
+        response = self.client.post(
+            '/api/v2/sunnah/log/',
+            {'prayer_type': 'tahajjud', 'completed': True},
+            format='json',
+        )
+
+        assert response.status_code == 200
+        log = SunnahLog.objects.get(user=self.user, prayer_type='tahajjud')
+        assert log.completed is True
 
     def test_growth_required(self):
         self.setUp()
@@ -94,7 +109,7 @@ class TestSunnahApi:
 
     def test_sunnah_does_not_mutate_streak(self):
         self.setUp()
-        streak = Streak.objects.get(user=self.user)
+        streak, _ = Streak.objects.get_or_create(user=self.user)
         before_streak = streak.current_streak
         before_tokens = streak.protector_tokens
 

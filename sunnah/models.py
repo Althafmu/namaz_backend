@@ -10,6 +10,9 @@ class SunnahLog(models.Model):
         ('asr', 'Asr Sunnah'),
         ('maghrib', 'Maghrib Sunnah'),
         ('isha', 'Isha Sunnah'),
+        ('witr', 'Witr'),
+        ('dhuha', 'Dhuha'),
+        ('tahajjud', 'Tahajjud'),
     ]
 
     user = models.ForeignKey(
