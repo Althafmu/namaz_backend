@@ -135,6 +135,7 @@ class DailyPrayerLogSerializer(serializers.ModelSerializer):
             'fajr_status', 'fajr_reason', 'dhuhr_status', 'dhuhr_reason',
             'asr_status', 'asr_reason', 'maghrib_status', 'maghrib_reason',
             'isha_status', 'isha_reason',
+            'prayed_jumah',
             'location', 'is_complete', 'completed_count', 'jamaat_count',
             'created_at', 'updated_at',
             'recovery',

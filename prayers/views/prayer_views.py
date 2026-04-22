@@ -122,6 +122,7 @@ def log_single_prayer(request):
     location = request.data.get('location', 'home')
     reason = request.data.get('reason', None)
     date_str = request.data.get('date', None)
+    prayed_jumah = request.data.get('prayed_jumah', False)
 
     valid_prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
     if prayer_name not in valid_prayers:
@@ -164,6 +165,9 @@ def log_single_prayer(request):
     setattr(log, fields[2], prayer_status)
     setattr(log, fields[3], reason)
     log.location = location
+
+    if prayer_name == 'dhuhr':
+        log.prayed_jumah = prayed_jumah
 
     try:
         log.full_clean()
@@ -399,6 +403,8 @@ def undo_last_prayer_action(request):
     setattr(log, f"{prayer_name}_in_jamaat", False)
     setattr(log, f"{prayer_name}_status", "pending")
     setattr(log, f"{prayer_name}_reason", None)
+    if prayer_name == 'dhuhr':
+        log.prayed_jumah = False
     log.save()
 
     streak, _ = Streak.objects.get_or_create(user=request.user)

@@ -202,6 +202,7 @@ class DailyPrayerLog(models.Model):
     # Each prayer: True = prayed, False = missed
     fajr = models.BooleanField(default=False)
     dhuhr = models.BooleanField(default=False)
+    prayed_jumah = models.BooleanField(default=False, help_text='If True, indicates the Friday noon prayer was Jumah instead of Dhuhr.')
     asr = models.BooleanField(default=False)
     maghrib = models.BooleanField(default=False)
     isha = models.BooleanField(default=False)

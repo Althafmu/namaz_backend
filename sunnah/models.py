@@ -6,7 +6,8 @@ from django.utils import timezone
 class SunnahLog(models.Model):
     PRAYER_TYPE_CHOICES = [
         ('fajr', 'Fajr Sunnah'),
-        ('dhuhr', 'Dhuhr Sunnah'),
+        ('dhuhr_before', 'Dhuhr Sunnah (2 Before)'),
+        ('dhuhr_after', 'Dhuhr Sunnah (2 After)'),
         ('asr', 'Asr Sunnah'),
         ('maghrib', 'Maghrib Sunnah'),
         ('isha', 'Isha Sunnah'),
