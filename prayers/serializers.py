@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import DailyPrayerLog, Streak, UserSettings
 
@@ -32,13 +33,24 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """Extends JWT login to include user info in the response."""
     def validate(self, attrs):
         data = super().validate(attrs)
-        data['user'] = UserSerializer(self.user).data
+        data['user'] = {
+            'id': self.user.id,
+            'username': self.user.username,
+            'email': self.user.email,
+            'first_name': self.user.first_name,
+            'last_name': self.user.last_name,
+            'is_active': self.user.is_active,
+        }
         return data
 
 
 class RegisterSerializer(serializers.ModelSerializer):
-    """Handles user registration."""
-    password = serializers.CharField(write_only=True, min_length=6)
+    """Handles user registration with secure password handling."""
+    password = serializers.CharField(
+        write_only=True,
+        min_length=8,
+        style={'input_type': 'password'},
+    )
     email = serializers.EmailField(required=True)
 
     class Meta:
@@ -50,12 +62,50 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("A user with this email already exists.")
         return value
 
+    def validate_password(self, value):
+        validate_password(value)
+        return value
+
     def create(self, validated_data):
-        user = User.objects.create_user(**validated_data)
-        # Create a streak record and default settings for the new user
+        user = User.objects.create_user(
+            email=validated_data['email'],
+            username=validated_data['username'],
+            password=validated_data['password'],
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', ''),
+            is_active=False,  # Requires email verification
+        )
         Streak.objects.create(user=user)
         UserSettings.objects.create(user=user)
         return user
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    """Request password reset — rate limited, no email enumeration."""
+    email = serializers.EmailField(required=True)
+
+    def validate_email(self, value):
+        # Security: Don't reveal whether email exists. Always return success.
+        return value.lower().strip()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    """Reset password with time-limited token."""
+    token = serializers.CharField(required=True)
+    password = serializers.CharField(
+        write_only=True,
+        min_length=8,
+        style={'input_type': 'password'},
+    )
+
+    def validate_password(self, value):
+        validate_password(value)
+        return value
+
+
+class EmailVerificationSerializer(serializers.Serializer):
+    """Verify email with time-limited token."""
+    token = serializers.CharField(required=True)
 
 
 class UserProfileSerializer(serializers.ModelSerializer):

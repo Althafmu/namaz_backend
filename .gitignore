@@ -36,6 +36,9 @@ db.sqlite3-journal
 staticfiles/
 static_root/
 
+# Security & audit logs
+logs/
+
 # Media files
 media/
 

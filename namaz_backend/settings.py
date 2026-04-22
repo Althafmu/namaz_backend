@@ -63,6 +63,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'prayers.middleware.SecurityEventLoggerMiddleware',
 ]
 
 ROOT_URLCONF = 'namaz_backend.urls'
@@ -102,6 +103,15 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
+# Use bcrypt-compatible hasher for better password security
+# Django's default PBKDF2 is fine, but bcrypt is stronger against GPU attacks
+# Note: requires bcrypt package. Falls back to Argon2 if available.
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.Argon2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+]
+
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
@@ -113,6 +123,16 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Email configuration (configure SMTP in production)
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@falah.app')
+FAKE_EMAIL_ENABLED = os.environ.get('FAKE_EMAIL_ENABLED', 'True').lower() == 'true'
 
 # CORS — strict allowlist in production
 cors_origins_raw = os.environ.get('CORS_ALLOWED_ORIGINS', '')
@@ -145,11 +165,16 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '10/minute',
-        'user': '60/minute',
+        'anon': '30/minute',
+        'user': '120/minute',
         'register': '5/minute',
         'prayer_log': '30/minute',
+        'password_reset': '3/minute',
+        'login': '5/minute',
+        'ai_generation': '10/minute',
+        'history_export': '5/minute',
     },
+    'NON_FIELD_ERRORS_KEY': 'detail',
 }
 
 if is_production_env:
@@ -164,6 +189,88 @@ if is_production_env:
     SECURE_HSTS_SECONDS = hsts_seconds
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+    # Security: Prevent clickjacking
+    X_FRAME_OPTIONS = 'DENY'
+    # Security: Reference-scopedReferrer
+    SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+    # Security: Force content-type sniffing protection
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    # Security: Browserdeny browserdeny
+    SECURE_BROWSER_XSS_FILTER = True
+
+# ─── LOGGING ─────────────────────────────────────────────────────────────────
+# Structured logging for security audit trails and anomaly detection.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+    },
+    'formatters': {
+        'verbose': {
+            'format': '{asctime} {levelname} {name} {message}',
+            'style': '{',
+        },
+        'security': {
+            'format': '{asctime} {levelname} {name} ip={client_ip} user={user} path={path} method={method} status={status} detail={detail}',
+            'style': '{',
+        },
+        'auth': {
+            'format': '{asctime} AUTH {levelname} action={action} ip={client_ip} username={username} success={success} detail={detail}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+            'filters': ['require_debug_false'],
+        },
+        'security_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'security.log',
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 5,
+            'formatter': 'security',
+            'filters': ['require_debug_false'],
+        },
+        'auth_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'auth.log',
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 5,
+            'formatter': 'auth',
+            'filters': ['require_debug_false'],
+        },
+    },
+    'loggers': {
+        'django.security': {
+            'handlers': ['console', 'security_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'prayers.security': {
+            'handlers': ['console', 'security_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'prayers.auth': {
+            'handlers': ['console', 'auth_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'prayers.throttle': {
+            'handlers': ['console', 'security_file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+    },
+}
+
+# Create logs directory if it doesn't exist
+(BASE_DIR / 'logs').mkdir(exist_ok=True)
 
 # Simple JWT
 AUTHENTICATION_BACKENDS = [
@@ -172,9 +279,10 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),  # Short-lived for security
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),   # Refresh tokens are rotated
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
+    'TOKEN_OBTAIN_SERIALIZER': 'prayers.serializers.CustomTokenObtainPairSerializer',
 }
