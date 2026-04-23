@@ -32,10 +32,12 @@ class LoginRateThrottle(AnonRateThrottle):
         ).count()
 
         if recent_failures >= self.num_failures_limit:
-            self.wait = self.lockout_minutes * 60
             return False
 
         return True
+
+    def wait(self):
+        return self.lockout_minutes * 60
 
     def get_ident(self, request):
         xff = request.META.get('HTTP_X_FORWARDED_FOR')
