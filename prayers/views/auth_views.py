@@ -18,7 +18,7 @@ from prayers.utils.email_service import EmailService
 class RegisterView(generics.CreateAPIView):
     """
     Register a new user.
-    User is created with is_active=False and an email verification token is sent.
+    User is created and activated immediately.
     """
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
@@ -30,21 +30,19 @@ class RegisterView(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
-        # Generate email verification token and send email
-        token = EmailVerificationToken.create_for_user(user)
-        EmailService.send_verification_email(user, token, request)
-
+        # Issue JWT tokens so user can log in immediately
+        refresh = RefreshToken.for_user(user)
+        
         return Response(
             {
-                "message": (
-                    "Account created. Please check your email to verify "
-                    "your account before logging in."
-                ),
+                "message": "Account created successfully.",
                 "user": {
                     "id": user.id,
                     "username": user.username,
                     "email": user.email,
                 },
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
             },
             status=status.HTTP_201_CREATED,
         )
