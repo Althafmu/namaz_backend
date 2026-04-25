@@ -280,7 +280,7 @@ class GoogleAuthView(generics.GenericAPIView):
     def post(self, request):
         token = request.data.get('id_token')
         if not token:
-            return Response({'error': 'id_token required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'id_token required'}, status=status.HTTP_400_BAD_REQUEST)
 
         client_id = settings.GOOGLE_CLIENT_ID
 
@@ -293,11 +293,13 @@ class GoogleAuthView(generics.GenericAPIView):
                 audience=client_id,
                 clock_skew_in_seconds=10,
             )
-        except ValueError:
-            return Response({'error': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
+        except ValueError as e:
+            return Response({'detail': f'Invalid token: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'detail': f'Token verification failed: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
         if not idinfo.get('email_verified'):
-            return Response({'error': 'Email not verified by Google'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'Email not verified by Google'}, status=status.HTTP_400_BAD_REQUEST)
 
         email = idinfo['email']
         first_name = idinfo.get('given_name', '')
@@ -306,14 +308,17 @@ class GoogleAuthView(generics.GenericAPIView):
         from django.contrib.auth import get_user_model
         User = get_user_model()
 
-        user, created = User.objects.get_or_create(
-            email=email,
-            defaults={
-                'username': email,
-                'first_name': first_name,
-                'last_name': last_name,
-            },
-        )
+        try:
+            user, created = User.objects.get_or_create(
+                email=email,
+                defaults={
+                    'username': email,
+                    'first_name': first_name,
+                    'last_name': last_name,
+                },
+            )
+        except Exception as e:
+            return Response({'detail': f'User creation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         if not created:
             updated = False
@@ -326,7 +331,11 @@ class GoogleAuthView(generics.GenericAPIView):
             if updated:
                 user.save()
 
-        refresh = RefreshToken.for_user(user)
+        try:
+            refresh = RefreshToken.for_user(user)
+        except Exception as e:
+            return Response({'detail': f'Token generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         return Response({
             'access': str(refresh.access_token),
             'refresh': str(refresh),
