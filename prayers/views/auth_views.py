@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from django.conf import settings
 
 from prayers.serializers import (
     RegisterSerializer,
@@ -271,3 +272,69 @@ class LogoutView(generics.GenericAPIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         return Response({"success": True}, status=status.HTTP_205_RESET_CONTENT)
+
+
+class GoogleAuthView(generics.GenericAPIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        token = request.data.get('id_token')
+        if not token:
+            return Response({'error': 'id_token required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        client_id = settings.GOOGLE_CLIENT_ID
+
+        try:
+            from google.oauth2 import id_token
+            from google.auth.transport import requests as google_requests
+            idinfo = id_token.verify_oauth2_token(
+                token,
+                google_requests.Request(),
+                audience=client_id,
+                clock_skew_in_seconds=10,
+            )
+        except ValueError:
+            return Response({'error': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not idinfo.get('email_verified'):
+            return Response({'error': 'Email not verified by Google'}, status=status.HTTP_400_BAD_REQUEST)
+
+        email = idinfo['email']
+        first_name = idinfo.get('given_name', '')
+        last_name = idinfo.get('family_name', '')
+
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        user, created = User.objects.get_or_create(
+            email=email,
+            defaults={
+                'username': email,
+                'first_name': first_name,
+                'last_name': last_name,
+            },
+        )
+
+        if not created:
+            updated = False
+            if not user.first_name and first_name:
+                user.first_name = first_name
+                updated = True
+            if not user.last_name and last_name:
+                user.last_name = last_name
+                updated = True
+            if updated:
+                user.save()
+
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+            },
+        })

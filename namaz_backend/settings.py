@@ -286,3 +286,9 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
     'TOKEN_OBTAIN_SERIALIZER': 'prayers.serializers.CustomTokenObtainPairSerializer',
 }
+
+# Google Sign-In
+GOOGLE_CLIENT_ID = os.environ.get(
+    'GOOGLE_CLIENT_ID',
+    '888527789566-8b4rqpn5cmju7l6vnvfn923lfrtf17gd.apps.googleusercontent.com'
+)

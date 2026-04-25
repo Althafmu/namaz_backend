@@ -12,6 +12,7 @@ from prayers.views.auth_views import (
     ResendVerificationEmailView,
     PasswordResetRequestView,
     PasswordResetConfirmView,
+    GoogleAuthView,
 )
 from prayers.models import LoginAttempt
 
@@ -69,6 +70,8 @@ urlpatterns = [
     path('api/auth/password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password-reset-confirm'),
     # Delete Account
     path('api/auth/delete/', DeleteAccountView.as_view(), name='delete-account'),
+    # Google Sign-In
+    path('api/auth/google/', GoogleAuthView.as_view(), name='google-auth'),
     # Prayer API
     path('api/', include('prayers.urls')),
     # Sunna API (Growth intent)
