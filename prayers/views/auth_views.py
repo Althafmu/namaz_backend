@@ -315,8 +315,13 @@ class GoogleAuthView(generics.GenericAPIView):
                     'username': email,
                     'first_name': first_name,
                     'last_name': last_name,
+                    'is_active': True,
                 },
             )
+
+            if not created and not user.is_active:
+                user.is_active = True
+                user.save(update_fields=['is_active'])
         except Exception as e:
             return Response({'detail': f'User creation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
