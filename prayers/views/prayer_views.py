@@ -253,6 +253,7 @@ def reason_summary(request):
 def set_excused_day(request):
     date_str = request.data.get('date')
     reason = request.data.get('reason', 'excused')
+    prayer_names = request.data.get('prayer_names')  # Optional: specific prayers to excuse
     if not date_str:
         return error_response("MISSING_DATE", "date is required. Format: YYYY-MM-DD", status.HTTP_400_BAD_REQUEST)
     try:
@@ -269,21 +270,23 @@ def set_excused_day(request):
 
     log, _ = DailyPrayerLog.objects.get_or_create(user=request.user, date=target_date)
     excused_reason = reason[:255] if reason else 'excused'
-    log.fajr_status = 'excused'
-    log.dhuhr_status = 'excused'
-    log.asr_status = 'excused'
-    log.maghrib_status = 'excused'
-    log.isha_status = 'excused'
-    log.fajr_reason = excused_reason
-    log.dhuhr_reason = excused_reason
-    log.asr_reason = excused_reason
-    log.maghrib_reason = excused_reason
-    log.isha_reason = excused_reason
-    log.fajr = True
-    log.dhuhr = True
-    log.asr = True
-    log.maghrib = True
-    log.isha = True
+
+    # If specific prayers are provided, only excuse those; otherwise excuse all pending
+    if prayer_names and isinstance(prayer_names, list):
+        target_prayers = [p for p in prayer_names if p in ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']]
+    else:
+        target_prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
+
+    # Only mark prayers that haven't been actively logged yet.
+    # This preserves any prayers the user already recorded before
+    # entering excused mode (e.g., logged Fajr/Dhuhr, then started travelling).
+    for prayer in target_prayers:
+        current_status = getattr(log, f'{prayer}_status')
+        if current_status in ('pending', None, ''):
+            setattr(log, prayer, True)
+            setattr(log, f'{prayer}_status', 'excused')
+            setattr(log, f'{prayer}_reason', excused_reason)
+
     log.save()
 
     streak, _ = Streak.objects.get_or_create(user=request.user)
