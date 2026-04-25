@@ -290,5 +290,5 @@ SIMPLE_JWT = {
 # Google Sign-In
 GOOGLE_CLIENT_ID = os.environ.get(
     'GOOGLE_CLIENT_ID',
-    '888527789566-8b4rqpn5cmju7l6vnvfn923lfrtf17gd.apps.googleusercontent.com'
+    '888527789566-qfojbi63uai8v6d726l4iqcuck02adoo.apps.googleusercontent.com'
 )
