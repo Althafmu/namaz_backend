@@ -86,7 +86,7 @@ def user_behavior_config_view(request):
     return Response(config)
 
 
-@api_view(['GET', 'POST'])
+@api_view(['GET', 'POST', 'DELETE'])
 @permission_classes([permissions.IsAuthenticated])
 def pause_notifications_today_view(request):
     settings_obj, _ = UserSettings.objects.get_or_create(user=request.user)
@@ -94,6 +94,10 @@ def pause_notifications_today_view(request):
 
     if request.method == 'POST':
         settings_obj.pause_notifications_until = today
+        settings_obj.save(update_fields=['pause_notifications_until'])
+
+    if request.method == 'DELETE':
+        settings_obj.pause_notifications_until = None
         settings_obj.save(update_fields=['pause_notifications_until'])
 
     is_paused = settings_obj.pause_notifications_until == today
@@ -105,4 +109,6 @@ def pause_notifications_today_view(request):
     }
     if request.method == 'POST':
         payload["message"] = "Notifications paused for today"
+    if request.method == 'DELETE':
+        payload["message"] = "Notifications resumed"
     return Response(payload)

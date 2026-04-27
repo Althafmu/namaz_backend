@@ -301,7 +301,7 @@ class GoogleAuthView(generics.GenericAPIView):
         if not idinfo.get('email_verified'):
             return Response({'detail': 'Email not verified by Google'}, status=status.HTTP_400_BAD_REQUEST)
 
-        email = idinfo['email']
+        email = idinfo['email'].lower()
         first_name = idinfo.get('given_name', '')
         last_name = idinfo.get('family_name', '')
 
