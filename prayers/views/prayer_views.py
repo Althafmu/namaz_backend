@@ -1,5 +1,4 @@
 from datetime import datetime
-from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, throttle_classes
@@ -7,10 +6,8 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from drf_spectacular.utils import extend_schema
 
-from prayers.models import DailyPrayerLog, Streak
+from prayers.models import DailyPrayerLog
 from prayers.serializers import DailyPrayerLogSerializer
-from prayers.services.prayer_status_service import classify_prayer_status
-from prayers.services.status_service import CanonicalPrayerStatus, canonical_to_db
 from prayers.services.streak_service import attach_recovery_to_logs
 from prayers.services import prayer_service
 from prayers.selectors import get_today_log, get_prayer_history, get_detailed_prayer_history, get_reason_summary, get_sync_status
@@ -24,23 +21,37 @@ from prayers.services.prayer_service import log_prayer, set_excused_day, clear_e
 @api_view(['GET', 'PUT'])
 @throttle_classes([ScopedRateThrottle])
 def today_prayer_log(request):
-    log, created = get_today_log(request.user)
+    log = get_today_log(request.user)
+    if log is None:
+        if request.method == 'GET':
+            return error_response("NOT_FOUND", "No prayer log found for today.", status.HTTP_404_NOT_FOUND)
+        # PUT: create/update via service
+        try:
+            updated_log = prayer_service.update_today_log(
+                user=request.user,
+                validated_data=request.data,
+                target_date=get_effective_today()
+            )
+            return Response(DailyPrayerLogSerializer(updated_log).data)
+        except ValueError as e:
+            return error_response("INVALID_INPUT", str(e), status.HTTP_400_BAD_REQUEST)
 
     if request.method == 'GET':
         attach_recovery_to_logs([log], request.user)
-        serializer = DailyPrayerLogSerializer(log)
-        return Response(serializer.data)
+        return Response(DailyPrayerLogSerializer(log).data)
 
-    # PUT - update today's log via service
+    # PUT
     try:
         updated_log = prayer_service.update_today_log(
             user=request.user,
-            data=request.data,
-            target_date=log.date,
+            validated_data=request.data,
+            target_date=log.date
         )
         return Response(DailyPrayerLogSerializer(updated_log).data)
     except ValueError as e:
         return error_response("INVALID_INPUT", str(e), status.HTTP_400_BAD_REQUEST)
+
+today_prayer_log.throttle_scope = "prayer_log"
 
 
 @extend_schema(tags=["Prayers"])
@@ -78,27 +89,30 @@ def prayer_history(request):
 @api_view(['POST'])
 @throttle_classes([ScopedRateThrottle])
 def log_single_prayer(request):
-    """Delegate to prayer_service.log_prayer."""
+    """Delegate to prayer_service.log_prayer with explicit args."""
     try:
-        log = prayer_service.log_prayer(request.user, request.data)
+        prayer_name = request.data.get('prayer_name')
+        if not prayer_name:
+            return error_response("MISSING_PRAYER", "prayer_name is required", status.HTTP_400_BAD_REQUEST)
+        completed = request.data.get('completed', False)
+        status_str = request.data.get('status')
+        reason = request.data.get('reason', '')
+        target_date_str = request.data.get('date')
+        target_date = datetime.strptime(target_date_str, '%Y-%m-%d').date() if target_date_str else None
+
+        log = prayer_service.log_prayer(
+            user=request.user,
+            prayer_name=prayer_name,
+            completed=completed,
+            status=status_str,
+            reason=reason,
+            target_date=target_date
+        )
         return Response(DailyPrayerLogSerializer(log).data)
     except ValueError as e:
         return error_response("INVALID_INPUT", str(e), status.HTTP_400_BAD_REQUEST)
 
 log_single_prayer.throttle_scope = "prayer_log"
-
-
-@extend_schema(tags=["Prayers"])
-@api_view(['GET'])
-def detailed_prayer_history(request):
-    today = get_effective_today()
-    try:
-        year = int(request.query_params.get('year', today.year))
-    except (ValueError, TypeError):
-        return error_response("INVALID_YEAR", "year parameter must be a valid integer", status.HTTP_400_BAD_REQUEST)
-
-    result = get_detailed_prayer_history(request.user, year=year)
-    return Response(result)
 
 
 @extend_schema(tags=["Prayers"])
@@ -132,7 +146,6 @@ def clear_excused_day(request):
 @extend_schema(tags=["Prayers"])
 @api_view(['GET'])
 def reason_summary(request):
-    today = get_effective_today()
     days = int(request.query_params.get('days', 30))
     result = get_reason_summary(request.user, days=days)
     return Response(result)
@@ -143,11 +156,14 @@ def reason_summary(request):
 def undo_last_prayer_action(request):
     today = get_effective_today()
     try:
-        target_date = datetime.strptime(request.data.get('date', ''), '%Y-%m-%d').date()
-    except (ValueError, TypeError):
+        target_date_str = request.query_params.get('date', '')
+        if target_date_str:
+            target_date = datetime.strptime(target_date_str, '%Y-%m-%d').date()
+        else:
+            target_date = today - timezone.timedelta(days=1)
+    except ValueError:
         target_date = today - timezone.timedelta(days=1)
 
-    # Service handles the undo logic
     try:
         log = prayer_service.undo_last_action(request.user, target_date)
         if log is None:
@@ -157,13 +173,23 @@ def undo_last_prayer_action(request):
         return error_response("INVALID_INPUT", str(e), status.HTTP_400_BAD_REQUEST)
 
 
-undo_last_prayer_action.throttle_scope = "prayer_log"
-
-
 @extend_schema(tags=["Prayers"])
 @api_view(['GET'])
 def sync_status_view(request):
     result = get_sync_status(request.user)
+    return Response(result)
+
+
+@extend_schema(tags=["Prayers"])
+@api_view(['GET'])
+def detailed_prayer_history(request):
+    today = get_effective_today()
+    try:
+        year = int(request.query_params.get('year', today.year))
+    except (ValueError, TypeError):
+        return error_response("INVALID_YEAR", "year parameter must be a valid integer", status.HTTP_400_BAD_REQUEST)
+
+    result = get_detailed_prayer_history(request.user, year=year)
     return Response(result)
 
 
@@ -177,5 +203,5 @@ def analytics_view(request):
         days = 30
 
     result = get_detailed_prayer_history(request.user, days=days)
-    result.pop('logs', None)  # Remove logs, keep stats
+    result.pop('logs', None)
     return Response(result)
