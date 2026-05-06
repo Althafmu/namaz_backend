@@ -2,7 +2,7 @@ from datetime import timedelta
 from django.utils import timezone
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.throttling import AnonRateThrottle
-from prayers.serializers import CustomTokenObtainPairSerializer
+from apps.accounts.serializers import CustomTokenObtainPairSerializer
 from apps.accounts.models import LoginAttempt
 
 class LoginRateThrottle(AnonRateThrottle):

@@ -10,6 +10,7 @@ from prayers.views.auth_views import (
     PasswordResetConfirmView,
     GoogleAuthView,
 )
+from apps.accounts.serializers import CustomTokenObtainPairSerializer
 from core.authentication.views import CustomTokenObtainPairView
 
 urlpatterns = [

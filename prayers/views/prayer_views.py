@@ -6,12 +6,15 @@ from rest_framework import status
 from rest_framework.decorators import api_view, throttle_classes
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
+from drf_spectacular.utils import extend_schema
 
 from prayers.models import DailyPrayerLog, Streak
 from prayers.serializers import DailyPrayerLogSerializer
 from prayers.services.prayer_status_service import classify_prayer_status
 from prayers.services.status_service import CanonicalPrayerStatus, canonical_to_db
 from prayers.services.streak_service import attach_recovery_to_logs
+from prayers.services import prayer_service
+from prayers.selectors import get_today_log, get_prayer_history, get_detailed_prayer_history, get_reason_summary, get_sync_status
 from prayers.utils.api_errors import error_response
 from prayers.utils.time_utils import get_effective_today
 

@@ -20,6 +20,8 @@ from prayers.views.settings_views import (
 )
 from prayers.views.streak_views import streak_view, consume_protector_token
 
+app_name = "prayers"
+
 urlpatterns = [
     path('auth/register/', RegisterView.as_view(), name='register'),
     path('auth/profile/', ProfileView.as_view(), name='profile'),

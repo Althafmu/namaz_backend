@@ -29,21 +29,6 @@ class UserSettingsSerializer(serializers.ModelSerializer):
         )
 
 
-class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Extends JWT login to include user info in the response."""
-    def validate(self, attrs):
-        data = super().validate(attrs)
-        data['user'] = {
-            'id': self.user.id,
-            'username': self.user.username,
-            'email': self.user.email,
-            'first_name': self.user.first_name,
-            'last_name': self.user.last_name,
-            'is_active': self.user.is_active,
-        }
-        return data
-
-
 class RegisterSerializer(serializers.ModelSerializer):
     """Handles user registration with secure password handling."""
     password = serializers.CharField(

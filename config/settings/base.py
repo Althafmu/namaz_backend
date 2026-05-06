@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+    'drf_spectacular',
     # Local
     'apps.accounts',
     'prayers',
@@ -119,11 +120,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
-    'EXCEPTION_HANDLER': 'prayers.utils.exception_handler.api_exception_handler',
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
-    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
@@ -138,8 +135,8 @@ REST_FRAMEWORK = {
         'ai_generation': '10/minute',
         'history_export': '5/minute',
     },
-    'EXCEPTION_HANDLER': 'core.exceptions.handlers.api_exception_handler',
     'NON_FIELD_ERRORS_KEY': 'detail',
+    'EXCEPTION_HANDLER': 'core.exceptions.handlers.api_exception_handler',
 }
 
 
@@ -225,7 +222,7 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
-    'TOKEN_OBTAIN_SERIALIZER': 'prayers.serializers.CustomTokenObtainPairSerializer',
+    'TOKEN_OBTAIN_SERIALIZER': 'apps.accounts.serializers.CustomTokenObtainPairSerializer',
 }
 
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')

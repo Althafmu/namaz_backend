@@ -1,6 +1,7 @@
 from rest_framework import permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema
 from prayers.utils.time_utils import get_effective_today
 
 from prayers.models import UserSettings

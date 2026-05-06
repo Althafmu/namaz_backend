@@ -4,6 +4,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from django.conf import settings
+from drf_spectacular.utils import extend_schema
 
 from prayers.serializers import (
     RegisterSerializer,
@@ -14,6 +15,14 @@ from prayers.serializers import (
 )
 from prayers.models import EmailVerificationToken, PasswordResetToken
 from prayers.utils.email_service import EmailService
+from apps.accounts.serializers import (
+    RegisterResponseSerializer,
+    VerifyEmailResponseSerializer,
+    MessageResponseSerializer,
+    ErrorResponseSerializer,
+    LogoutResponseSerializer,
+    GoogleAuthResponseSerializer,
+)
 
 
 class RegisterView(generics.CreateAPIView):
@@ -35,20 +44,17 @@ class RegisterView(generics.CreateAPIView):
         refresh = RefreshToken.for_user(user)
         
         return Response(
-            {
-                "message": "Account created successfully.",
-                "user": {
-                    "id": user.id,
-                    "username": user.username,
-                    "email": user.email,
-                },
-                "access": str(refresh.access_token),
-                "refresh": str(refresh),
-            },
+            RegisterResponseSerializer({
+                'message': "Account created successfully.",
+                'user': user,
+                'access': str(refresh.access_token),
+                'refresh': str(refresh),
+            }).data,
             status=status.HTTP_201_CREATED,
         )
 
 
+@extend_schema(tags=["Auth"])
 class VerifyEmailView(generics.GenericAPIView):
     """
     Verify user's email address using the token from the email link.
@@ -74,7 +80,7 @@ class VerifyEmailView(generics.GenericAPIView):
 
         if not token.is_valid():
             return Response(
-                {"error": "Invalid or expired verification token."},
+                ErrorResponseSerializer({'error': "Invalid or expired verification token."}).data,
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -88,15 +94,16 @@ class VerifyEmailView(generics.GenericAPIView):
         # Issue JWT tokens so user can log in immediately
         refresh = RefreshToken.for_user(user)
         return Response(
-            {
-                "message": "Email verified successfully. You can now log in.",
-                "access": str(refresh.access_token),
-                "refresh": str(refresh),
-            },
+            VerifyEmailResponseSerializer({
+                'message': "Email verified successfully. You can now log in.",
+                'access': str(refresh.access_token),
+                'refresh': str(refresh),
+            }).data,
             status=status.HTTP_200_OK,
         )
 
 
+@extend_schema(tags=["Auth"])
 class ResendVerificationEmailView(generics.GenericAPIView):
     """
     Resend the verification email (rate limited).
@@ -109,7 +116,7 @@ class ResendVerificationEmailView(generics.GenericAPIView):
         email = request.data.get('email', '').strip().lower()
         if not email:
             return Response(
-                {"error": "Email is required."},
+                ErrorResponseSerializer({'error': "Email is required."}).data,
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -121,13 +128,13 @@ class ResendVerificationEmailView(generics.GenericAPIView):
         except User.DoesNotExist:
             # Security: Don't reveal whether email exists
             return Response(
-                {"message": "If the email exists and is unverified, a verification link has been sent."},
+                MessageResponseSerializer({'message': "If the email exists and is unverified, a verification link has been sent."}).data,
                 status=status.HTTP_200_OK,
             )
 
         if user.is_active:
             return Response(
-                {"message": "This account is already verified."},
+                MessageResponseSerializer({'message': "This account is already verified."}).data,
                 status=status.HTTP_200_OK,
             )
 
@@ -139,7 +146,7 @@ class ResendVerificationEmailView(generics.GenericAPIView):
 
         if recent_token:
             return Response(
-                {"message": "A verification email was already sent. Please wait before requesting again."},
+                ErrorResponseSerializer({'error': "A verification email was already sent. Please wait before requesting again."}).data,
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
@@ -147,11 +154,12 @@ class ResendVerificationEmailView(generics.GenericAPIView):
         EmailService.send_verification_email(user, token, request)
 
         return Response(
-            {"message": "If the email exists and is unverified, a verification link has been sent."},
+            MessageResponseSerializer({'message': "If the email exists and is unverified, a verification link has been sent."}).data,
             status=status.HTTP_200_OK,
         )
 
 
+@extend_schema(tags=["Auth"])
 class PasswordResetRequestView(generics.GenericAPIView):
     """
     Request a password reset email.
@@ -218,11 +226,12 @@ class PasswordResetConfirmView(generics.GenericAPIView):
             return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(
-            {"message": "Password reset successful. Please log in with your new password."},
+            MessageResponseSerializer({'message': "Password reset successful. Please log in with your new password."}).data,
             status=status.HTTP_200_OK,
         )
 
 
+@extend_schema(tags=["Auth"])
 class ProfileView(generics.RetrieveUpdateAPIView):
     """Profile is only accessible to authenticated, email-verified users."""
     serializer_class = UserProfileSerializer
@@ -232,6 +241,7 @@ class ProfileView(generics.RetrieveUpdateAPIView):
         return self.request.user
 
 
+@extend_schema(tags=["Auth"])
 class DeleteAccountView(generics.DestroyAPIView):
     """Delete account — only for authenticated users."""
     permission_classes = [permissions.IsAuthenticated]
@@ -246,6 +256,7 @@ class DeleteAccountView(generics.DestroyAPIView):
         )
 
 
+@extend_schema(tags=["Auth"])
 class LogoutView(generics.GenericAPIView):
     """Logout and blacklist the refresh token."""
     permission_classes = [permissions.IsAuthenticated]
@@ -271,9 +282,13 @@ class LogoutView(generics.GenericAPIView):
                 {"error": "Logout failed"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        return Response({"success": True}, status=status.HTTP_205_RESET_CONTENT)
+        return Response(
+            LogoutResponseSerializer({'success': True}).data,
+            status=status.HTTP_205_RESET_CONTENT,
+        )
 
 
+@extend_schema(tags=["Auth"])
 class GoogleAuthView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
 
@@ -341,14 +356,17 @@ class GoogleAuthView(generics.GenericAPIView):
         except Exception as e:
             return Response({'detail': f'Token generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        return Response({
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-            },
-        })
+        return Response(
+            GoogleAuthResponseSerializer({
+                'access': str(refresh.access_token),
+                'refresh': str(refresh),
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                },
+            }).data,
+            status=status.HTTP_200_OK,
+        )

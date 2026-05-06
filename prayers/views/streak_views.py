@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema
 
 from prayers.models import DailyPrayerLog, Streak
 from prayers.serializers import StreakSerializer
@@ -10,6 +11,7 @@ from prayers.utils.api_errors import error_response
 from prayers.utils.time_utils import get_effective_today
 
 
+@extend_schema(tags=["Streak"])
 @api_view(['GET'])
 def streak_view(request):
     streak, _ = Streak.objects.get_or_create(user=request.user)
@@ -18,6 +20,7 @@ def streak_view(request):
     return Response(serializer.data)
 
 
+@extend_schema(tags=["Streak"])
 @api_view(['POST'])
 def consume_protector_token(request):
     streak, _ = Streak.objects.get_or_create(user=request.user)
