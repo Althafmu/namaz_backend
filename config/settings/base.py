@@ -40,7 +40,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'prayers.middleware.SecurityEventLoggerMiddleware',
+    'core.middleware.security.SecurityEventLoggerMiddleware',
 ]
 
 ALLOWED_HOSTS = os.environ.get(
@@ -123,6 +123,10 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
     ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': '30/minute',
         'user': '120/minute',
@@ -134,7 +138,9 @@ REST_FRAMEWORK = {
         'history_export': '5/minute',
     },
     'NON_FIELD_ERRORS_KEY': 'detail',
+    'EXCEPTION_HANDLER': 'core.exceptions.handlers.api_exception_handler',
 }
+
 
 LOGGING = {
     'version': 1,
@@ -208,7 +214,7 @@ LOGGING = {
 (BASE_DIR / 'logs').mkdir(exist_ok=True)
 
 AUTHENTICATION_BACKENDS = [
-    'prayers.backends.EmailBackend',
+    'core.authentication.backends.EmailBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 

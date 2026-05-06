@@ -14,7 +14,27 @@ from prayers.views.auth_views import (
     PasswordResetConfirmView,
     GoogleAuthView,
 )
+from django.contrib import admin
+from django.urls import path, include
+from django.utils import timezone
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework.throttling import AnonRateThrottle
+from prayers.serializers import CustomTokenObtainPairSerializer
+from prayers.views.auth_views import (
+    DeleteAccountView,
+    LogoutView,
+    RegisterView,
+    VerifyEmailView,
+    ResendVerificationEmailView,
+    PasswordResetRequestView,
+    PasswordResetConfirmView,
+    GoogleAuthView,
+)
 from prayers.models import LoginAttempt
+from core.health import health_check
+
+# ... (LoginRateThrottle and CustomTokenObtainPairView definitions remain the same)
+# [Skipped for brevity in this tool call, but I will preserve them in the final file]
 
 
 class LoginRateThrottle(AnonRateThrottle):
@@ -55,10 +75,14 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         response = super().post(request, *args, **kwargs)
         return response
 
+# ... (imports)
+# Add health check route
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/v1/health/', health_check, name='health_check'),
     # JWT Authentication
     path('api/auth/login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
+# ...
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/auth/logout/', LogoutView.as_view(), name='logout'),
     # Registration & Email Verification
