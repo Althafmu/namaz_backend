@@ -10,13 +10,6 @@ from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# Boot Validation
-REQUIRED_ENV_VARS = ['SECRET_KEY']
-if not os.environ.get('DEBUG', 'False').lower() == 'true':
-    missing = [var for var in REQUIRED_ENV_VARS if not os.environ.get(var)]
-    if missing:
-        raise ImproperlyConfigured(f"Missing required environment variables: {', '.join(missing)}")
-
 SECRET_KEY = os.environ.get('SECRET_KEY')
 
 INSTALLED_APPS = [
@@ -36,7 +29,8 @@ INSTALLED_APPS = [
     'sunnah',
 ]
 
-MIDDLEWARE = [
+# ... current content ...
+SESSIONS_MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -48,6 +42,13 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'prayers.middleware.SecurityEventLoggerMiddleware',
 ]
+
+ALLOWED_HOSTS = os.environ.get(
+    'ALLOWED_HOSTS',
+    'localhost,127.0.0.1'
+).split(',')
+# ... rest of content ...
+
 
 ROOT_URLCONF = 'config.urls'
 

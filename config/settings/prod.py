@@ -1,16 +1,19 @@
 from .base import *
 import os
 import warnings
+from django.core.exceptions import ImproperlyConfigured
 
 DEBUG = False
 
-# Enforce SECRET_KEY in production
-if not os.environ.get('SECRET_KEY'):
-    from django.core.exceptions import ImproperlyConfigured
-    raise ImproperlyConfigured('SECRET_KEY environment variable is required in production.')
+# Enforce REQUIRED_ENV_VARS in production
+REQUIRED_ENV_VARS = ['SECRET_KEY', 'GOOGLE_CLIENT_ID', 'DATABASE_URL']
+missing = [var for var in REQUIRED_ENV_VARS if not os.environ.get(var)]
+if missing:
+    raise ImproperlyConfigured(f"Missing required environment variables in production: {', '.join(missing)}")
 
 # Security
 SECURE_SSL_REDIRECT = True
+# ... rest of content ...
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

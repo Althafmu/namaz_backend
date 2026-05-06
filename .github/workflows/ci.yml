@@ -11,15 +11,15 @@ jobs:
           python-version: '3.10'
       - name: Install dependencies
         run: |
-          pip install -r namaz_backend/requirements.txt
+          pip install -r requirements.txt
           pip install black isort flake8 mypy pytest
       - name: Lint with black
-        run: black --check namaz_backend/
+        run: black --check .
       - name: Lint with isort
-        run: isort --check-only namaz_backend/
+        run: isort --check-only .
       - name: Lint with flake8
-        run: flake8 namaz_backend/
+        run: flake8 .
       - name: Type check with mypy
-        run: mypy namaz_backend/
+        run: mypy .
       - name: Run tests
-        run: pytest namaz_backend/
+        run: pytest
