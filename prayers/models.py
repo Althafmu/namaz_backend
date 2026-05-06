@@ -52,19 +52,8 @@ class UserSettings(models.Model):
         return f'Settings for {self.user.username}'
 
 
-class LoginAttempt(models.Model):
-    """Tracks failed login attempts for abuse detection and account lockout."""
-
-    ip_address = models.GenericIPAddressField()
-    username_email = models.CharField(max_length=254, blank=True)
-    attempted_at = models.DateTimeField(auto_now_add=True)
-    user_agent = models.TextField(blank=True)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=['ip_address', 'attempted_at']),
-            models.Index(fields=['username_email', 'attempted_at']),
-        ]
+class UserSettings(models.Model):
+    """Stores per-user calculation settings for cloud sync (EPIC 3)."""
 
 
 class EmailVerificationToken(models.Model):

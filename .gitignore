@@ -1,77 +1,11 @@
-# Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual environments
-venv/
-ENV/
-env/
-.venv/
-
-# Django
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Static files
-staticfiles/
-static_root/
-
-# Security & audit logs
-logs/
-
-# Media files
-media/
-
-# Environment variables
-.env
-.env.*
-!.env.example
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Coverage
-htmlcov/
-.coverage
-.coverage.*
-.cache/
-nosetests.xml
-coverage.xml
-*.cover
-
-# pytest
+*.class
 .pytest_cache/
-
-# mypy
 .mypy_cache/
-
-# Generated artifacts
-diff_output.txt
-test_results.txt
+.ruff_cache/
+.env
+.venv/
+staticfiles/
+db.sqlite3
+logs/

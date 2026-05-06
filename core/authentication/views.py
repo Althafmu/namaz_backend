@@ -1,18 +1,19 @@
+from datetime import timedelta
 from django.utils import timezone
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.throttling import AnonRateThrottle
 from prayers.serializers import CustomTokenObtainPairSerializer
-from prayers.models import LoginAttempt
+from apps.accounts.models import LoginAttempt
 
 class LoginRateThrottle(AnonRateThrottle):
-    rate = '5/minute'
-    num_failures_limit = 5
-    lockout_minutes = 15
+    rate: str = '5/minute'
+    num_failures_limit: int = 5
+    lockout_minutes: int = 15
 
-    def allow_request(self, request, view):
+    def allow_request(self, request, view) -> bool:
         ident = self.get_ident(request)
         now = timezone.now()
-        window_start = now - timezone.timedelta(minutes=self.lockout_minutes)
+        window_start = now - timedelta(minutes=self.lockout_minutes)
 
         recent_failures = LoginAttempt.objects.filter(
             ip_address=ident,
@@ -24,10 +25,10 @@ class LoginRateThrottle(AnonRateThrottle):
 
         return True
 
-    def wait(self):
+    def wait(self) -> int:
         return self.lockout_minutes * 60
 
-    def get_ident(self, request):
+    def get_ident(self, request) -> str:
         xff = request.META.get('HTTP_X_FORWARDED_FOR')
         if xff:
             return xff.split(',')[0].strip()
@@ -37,7 +38,3 @@ class LoginRateThrottle(AnonRateThrottle):
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
     throttle_classes = [LoginRateThrottle]
-
-    def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
-        return response
