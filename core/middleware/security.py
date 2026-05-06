@@ -32,14 +32,6 @@ def _get_client_ip(request):
     return request.META.get('REMOTE_ADDR', '')
 
 
-# ... imports and constants ...
-def _get_client_ip(request):
-# ... implementation ...
-# Remove _mask_sensitive() as it is unused
-class SecurityEventLoggerMiddleware(MiddlewareMixin):
-# ... implementation ...
-
-
 class SecurityEventLoggerMiddleware(MiddlewareMixin):
     """
     Logs security-relevant events:
