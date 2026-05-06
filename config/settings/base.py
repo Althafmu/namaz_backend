@@ -137,8 +137,8 @@ REST_FRAMEWORK = {
         'ai_generation': '10/minute',
         'history_export': '5/minute',
     },
-    'NON_FIELD_ERRORS_KEY': 'detail',
     'EXCEPTION_HANDLER': 'core.exceptions.handlers.api_exception_handler',
+    'NON_FIELD_ERRORS_KEY': 'detail',
 }
 
 

@@ -3,9 +3,9 @@ import re
 import time
 from django.utils.deprecation import MiddlewareMixin
 
-logger = logging.getLogger('prayers.security')
-auth_logger = logging.getLogger('prayers.auth')
-throttle_logger = logging.getLogger('prayers.throttle')
+logger = logging.getLogger('core.security')
+auth_logger = logging.getLogger('core.auth')
+throttle_logger = logging.getLogger('core.throttle')
 
 CLEAR_TEXT_ENDPOINTS = frozenset({
     '/api/auth/login/',
@@ -32,18 +32,12 @@ def _get_client_ip(request):
     return request.META.get('REMOTE_ADDR', '')
 
 
-def _mask_sensitive(data):
-    """Mask sensitive fields in request data for logging."""
-    if not isinstance(data, dict):
-        return {}
-    masked = {}
-    sensitive = {'password', 'token', 'refresh', 'secret', 'api_key', 'authorization'}
-    for key, value in data.items():
-        if key.lower() in sensitive:
-            masked[key] = '***REDACTED***'
-        else:
-            masked[key] = value
-    return masked
+# ... imports and constants ...
+def _get_client_ip(request):
+# ... implementation ...
+# Remove _mask_sensitive() as it is unused
+class SecurityEventLoggerMiddleware(MiddlewareMixin):
+# ... implementation ...
 
 
 class SecurityEventLoggerMiddleware(MiddlewareMixin):

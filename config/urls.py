@@ -1,41 +1,11 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.utils import timezone
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.throttling import AnonRateThrottle
 from prayers.serializers import CustomTokenObtainPairSerializer
-from prayers.views.auth_views import (
-    DeleteAccountView,
-    LogoutView,
-    RegisterView,
-    VerifyEmailView,
-    ResendVerificationEmailView,
-    PasswordResetRequestView,
-    PasswordResetConfirmView,
-    GoogleAuthView,
-)
-from django.contrib import admin
-from django.urls import path, include
-from django.utils import timezone
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from rest_framework.throttling import AnonRateThrottle
-from prayers.serializers import CustomTokenObtainPairSerializer
-from prayers.views.auth_views import (
-    DeleteAccountView,
-    LogoutView,
-    RegisterView,
-    VerifyEmailView,
-    ResendVerificationEmailView,
-    PasswordResetRequestView,
-    PasswordResetConfirmView,
-    GoogleAuthView,
-)
 from prayers.models import LoginAttempt
 from core.health import health_check
-
-# ... (LoginRateThrottle and CustomTokenObtainPairView definitions remain the same)
-# [Skipped for brevity in this tool call, but I will preserve them in the final file]
-
 
 class LoginRateThrottle(AnonRateThrottle):
     rate = '5/minute'
@@ -75,29 +45,10 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         response = super().post(request, *args, **kwargs)
         return response
 
-# ... (imports)
-# Add health check route
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/v1/health/', health_check, name='health_check'),
-    # JWT Authentication
-    path('api/auth/login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
-# ...
-    path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('api/auth/logout/', LogoutView.as_view(), name='logout'),
-    # Registration & Email Verification
-    path('api/auth/register/', RegisterView.as_view(), name='register'),
-    path('api/auth/verify-email/', VerifyEmailView.as_view(), name='verify-email'),
-    path('api/auth/resend-verification/', ResendVerificationEmailView.as_view(), name='resend-verification'),
-    # Password Reset
-    path('api/auth/password-reset/', PasswordResetRequestView.as_view(), name='password-reset-request'),
-    path('api/auth/password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password-reset-confirm'),
-    # Delete Account
-    path('api/auth/delete/', DeleteAccountView.as_view(), name='delete-account'),
-    # Google Sign-In
-    path('api/auth/google/', GoogleAuthView.as_view(), name='google-auth'),
-    # Prayer API
-    path('api/', include('prayers.urls')),
-    # Sunna API (Growth intent)
-    path('api/v2/sunnah/', include('sunnah.urls')),
+    path('api/v1/auth/', include('prayers.urls.auth')),
+    path('api/v1/', include('prayers.urls')),
+    path('api/v1/sunnah/', include('sunnah.urls')),
 ]

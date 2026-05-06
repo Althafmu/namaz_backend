@@ -1,8 +1,9 @@
+from rest_framework.response import Response
 import logging
 from rest_framework.views import exception_handler as drf_exception_handler
 
-logger = logging.getLogger('prayers.security')
-auth_logger = logging.getLogger('prayers.auth')
+logger = logging.getLogger('core.security')
+auth_logger = logging.getLogger('core.auth')
 
 
 def _get_client_ip(request):
@@ -74,10 +75,5 @@ def api_exception_handler(exc, context):
                 }
             )
 
-    response.data = {
-        "code": "API_ERROR",
-        "detail": str(detail),
-        "field_errors": field_errors,
-        "error": str(detail),
-    }
+    response.data = response.data
     return response

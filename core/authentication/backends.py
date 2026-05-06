@@ -1,7 +1,8 @@
 from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth import get_user_model
 from django.db.models import Q
-from django.utils import timezone
+
+User = get_user_model()
 
 User = get_user_model()
 
@@ -37,11 +38,11 @@ class EmailBackend(ModelBackend):
         try:
             ident = self._get_client_ip(request)
             user_agent = request.META.get('HTTP_USER_AGENT', '')[:500]
-            from prayers.models import LoginAttempt
-            LoginAttempt.objects.create(
-                ip_address=ident,
-                username_email=username or '',
-                user_agent=user_agent,
+            # Use a generic logging approach to avoid reverse coupling to prayers.models
+            import logging
+            logging.getLogger('core.auth').warning(
+                'FAILED_LOGIN_ATTEMPT ip=%s user=%s agent=%s',
+                ident, username, user_agent
             )
         except Exception:
             pass
