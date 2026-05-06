@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
 from prayers.utils.time_utils import get_effective_today
 
-from prayers.models import UserSettings
+from prayers.services.settings_service import ensure_user_settings_exist
 from prayers.serializers import UserSettingsSerializer
 from prayers.utils.api_errors import error_response
 
@@ -12,7 +12,7 @@ from prayers.utils.api_errors import error_response
 @api_view(['PATCH'])
 @permission_classes([permissions.IsAuthenticated])
 def profile_offsets_view(request):
-    settings_obj, _ = UserSettings.objects.get_or_create(user=request.user)
+    settings_obj = ensure_user_settings_exist(request.user)
     manual_offsets = request.data.get('manual_offsets')
     calculation_method = request.data.get('calculation_method')
     use_hanafi = request.data.get('use_hanafi')
@@ -59,7 +59,7 @@ def profile_offsets_view(request):
 @api_view(['PATCH'])
 @permission_classes([permissions.IsAuthenticated])
 def update_intent_view(request):
-    settings_obj, _ = UserSettings.objects.get_or_create(user=request.user)
+    settings_obj = ensure_user_settings_exist(request.user)
     intent_level = request.data.get('intent_level')
     if intent_level is not None:
         if isinstance(intent_level, str):
@@ -90,7 +90,7 @@ def user_behavior_config_view(request):
 @api_view(['GET', 'POST', 'DELETE'])
 @permission_classes([permissions.IsAuthenticated])
 def pause_notifications_today_view(request):
-    settings_obj, _ = UserSettings.objects.get_or_create(user=request.user)
+    settings_obj = ensure_user_settings_exist(request.user)
     today = get_effective_today()
 
     if request.method == 'POST':

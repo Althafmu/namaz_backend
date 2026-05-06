@@ -9,25 +9,25 @@ from drf_spectacular.utils import extend_schema
 from prayers.models import DailyPrayerLog
 from prayers.serializers import DailyPrayerLogSerializer
 from prayers.services.streak_service import attach_recovery_to_logs
-from prayers.services import prayer_service
-from prayers.selectors import get_today_log, get_prayer_history, get_detailed_prayer_history, get_reason_summary, get_sync_status
+from prayers.services.prayer_logging_service import update_today_log, log_prayer
+from prayers.services.excused_day_service import set_excused_day, clear_excused_day
+from prayers.services.undo_service import undo_last_action
+from prayers.selectors import get_today_log, get_prayer_history_queryset, get_detailed_prayer_history, get_reason_summary, get_sync_status
 from prayers.utils.api_errors import error_response
 from prayers.utils.time_utils import get_effective_today
-
-from prayers.services.prayer_service import log_prayer, set_excused_day, clear_excused_day
 
 
 @extend_schema(tags=["Prayers"])
 @api_view(['GET', 'PUT'])
 @throttle_classes([ScopedRateThrottle])
 def today_prayer_log(request):
-    log = get_today_log(request.user)
+    log, created = get_today_log(request.user)
     if log is None:
         if request.method == 'GET':
             return error_response("NOT_FOUND", "No prayer log found for today.", status.HTTP_404_NOT_FOUND)
         # PUT: create/update via service
         try:
-            updated_log = prayer_service.update_today_log(
+            updated_log = update_today_log(
                 user=request.user,
                 validated_data=request.data,
                 target_date=get_effective_today()
@@ -42,7 +42,7 @@ def today_prayer_log(request):
 
     # PUT
     try:
-        updated_log = prayer_service.update_today_log(
+        updated_log = update_today_log(
             user=request.user,
             validated_data=request.data,
             target_date=log.date
@@ -73,15 +73,22 @@ def prayer_history(request):
     page_size = 30
     page = max(1, page)
 
-    result = get_prayer_history(request.user, days=days, page=page, page_size=page_size)
-    logs_page = result['results']
+    # Get queryset from selector
+    queryset = get_prayer_history_queryset(request.user, days=days)
+    total_count = queryset.count()
+    total_pages = max(1, (total_count + page_size - 1) // page_size)
+    page = max(1, min(page, total_pages))
+
+    offset = (page - 1) * page_size
+    logs_page = queryset[offset:offset + page_size]
+
     serializer = DailyPrayerLogSerializer(logs_page, many=True)
     return Response({
         'results': serializer.data,
-        'count': result['count'],
-        'page': result['page'],
-        'total_pages': result['total_pages'],
-        'page_size': result['page_size'],
+        'count': total_count,
+        'page': page,
+        'total_pages': total_pages,
+        'page_size': page_size,
     })
 
 
@@ -89,7 +96,7 @@ def prayer_history(request):
 @api_view(['POST'])
 @throttle_classes([ScopedRateThrottle])
 def log_single_prayer(request):
-    """Delegate to prayer_service.log_prayer with explicit args."""
+    """Delegate to log_prayer with explicit args."""
     try:
         prayer_name = request.data.get('prayer_name')
         if not prayer_name:
@@ -100,7 +107,7 @@ def log_single_prayer(request):
         target_date_str = request.data.get('date')
         target_date = datetime.strptime(target_date_str, '%Y-%m-%d').date() if target_date_str else None
 
-        log = prayer_service.log_prayer(
+        log = log_prayer(
             user=request.user,
             prayer_name=prayer_name,
             completed=completed,
@@ -165,7 +172,7 @@ def undo_last_prayer_action(request):
         target_date = today - timezone.timedelta(days=1)
 
     try:
-        log = prayer_service.undo_last_action(request.user, target_date)
+        log = undo_last_action(request.user, target_date)
         if log is None:
             return error_response("NO_ACTION", "No action to undo for this date.", status.HTTP_400_BAD_REQUEST)
         return Response(DailyPrayerLogSerializer(log).data)

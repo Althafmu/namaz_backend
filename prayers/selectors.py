@@ -3,8 +3,9 @@ from django.utils import timezone
 from django.db.models import Q, Count, Case, When, IntegerField, F
 from prayers.models import DailyPrayerLog, Streak
 
+
 def get_today_log(user, target_date=None):
-    """Get today's prayer log for a user (read-only)."""
+    """Get today's prayer log for a user (read-only). Returns (log, created_bool)."""
     if target_date is None:
         target_date = timezone.localdate()
     try:
@@ -17,35 +18,21 @@ def get_today_log(user, target_date=None):
         return None, False  # None = not found
 
 
-def get_prayer_history(user, days=7, page=1, page_size=30):
-    """Get prayer history with pagination (read-only)."""
+def get_prayer_history_queryset(user, days=7):
+    """Return QuerySet of prayer logs for N days. No pagination semantics."""
     today = timezone.localdate()
     start_date = today - timezone.timedelta(days=days - 1)
     
-    logs = DailyPrayerLog.objects.filter(
+    return DailyPrayerLog.objects.filter(
         user=user,
         date__gte=start_date,
         date__lte=today,
     ).order_by('-date')
-    
-    total_count = logs.count()
-    total_pages = max(1, (total_count + page_size - 1) // page_size)
-    page = max(1, page)
-    
-    offset = (page - 1) * page_size
-    logs_page = logs[offset:offset + page_size]
-    
-    return {
-        'results': logs_page,
-        'count': total_count,
-        'page': page,
-        'total_pages': total_pages,
-        'page_size': page_size,
-    }
+    # Returns QuerySet - caller decides pagination
 
 
 def get_detailed_prayer_history(user, days=30):
-    """Get detailed prayer history statistics (read-only)."""
+    """Get detailed prayer history statistics (read-only). Returns dict with QuerySet."""
     today = timezone.localdate()
     start_date = today - timezone.timedelta(days=days - 1)
     
@@ -66,7 +53,7 @@ def get_detailed_prayer_history(user, days=30):
     ).count()
     
     return {
-        'logs': logs,
+        'logs': logs,  # QuerySet, not evaluated
         'total_days': total_days,
         'completed_days': completed_days,
         'completion_rate': (completed_days / total_days * 100) if total_days > 0 else 0,
@@ -74,7 +61,7 @@ def get_detailed_prayer_history(user, days=30):
 
 
 def get_reason_summary(user, days=30):
-    """Get summary of reasons for missed prayers (read-only)."""
+    """Get summary of reasons for missed prayers (read-only). Returns QuerySet."""
     today = timezone.localdate()
     start_date = today - timezone.timedelta(days=days - 1)
     
@@ -84,16 +71,14 @@ def get_reason_summary(user, days=30):
         date__lte=today,
     )
     
-    # Aggregate reasons
-    reason_counts = logs.values('fajr_reason', 'dhuhr_reason', 'asr_reason', 'maghrib_reason', 'isha_reason').annotate(
+    # Aggregate reasons - returns QuerySet (not evaluated)
+    return logs.values('fajr_reason', 'dhuhr_reason', 'asr_reason', 'maghrib_reason', 'isha_reason').annotate(
         count=Count('id')
     )
-    
-    return reason_counts
 
 
 def get_sync_status(user):
-    """Get sync status for a user (read-only)."""
+    """Get sync status for a user (read-only). Returns dict."""
     from prayers.models import UserSettings
     try:
         settings = UserSettings.objects.get(user=user)

@@ -5,8 +5,9 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
 
-from prayers.models import DailyPrayerLog, Streak
+from prayers.models import DailyPrayerLog
 from prayers.serializers import StreakSerializer
+from prayers.services.streak_service import ensure_streak_exists
 from prayers.utils.api_errors import error_response
 from prayers.utils.time_utils import get_effective_today
 
@@ -14,7 +15,7 @@ from prayers.utils.time_utils import get_effective_today
 @extend_schema(tags=["Streak"])
 @api_view(['GET'])
 def streak_view(request):
-    streak, _ = Streak.objects.get_or_create(user=request.user)
+    streak = ensure_streak_exists(request.user)
     streak.recalculate()
     serializer = StreakSerializer(streak)
     return Response(serializer.data)
@@ -23,7 +24,7 @@ def streak_view(request):
 @extend_schema(tags=["Streak"])
 @api_view(['POST'])
 def consume_protector_token(request):
-    streak, _ = Streak.objects.get_or_create(user=request.user)
+    streak = ensure_streak_exists(request.user)
     can_use = streak.can_use_token()
     if not can_use['allowed']:
         response = error_response("TOKEN_NOT_ALLOWED", can_use['reason'], status.HTTP_400_BAD_REQUEST)

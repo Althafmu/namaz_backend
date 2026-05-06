@@ -259,13 +259,3 @@ def counts_toward_streak_increment(log):
         completed and is_completion_status_db(status)
         for completed, status in zip(log.prayer_completed, log.prayer_statuses)
     )
-
-
-def ensure_streak_exists(user) -> 'Streak':
-    """
-    Mutation: ensures streak exists for user.
-    Communicates side effect via "ensure" naming.
-    """
-    from prayers.models import Streak
-    streak, _ = Streak.objects.get_or_create(user=user)
-    return streak
