@@ -149,3 +149,49 @@ class StreakSerializer(serializers.ModelSerializer):
     def get_display_streak(self, obj):
         """Returns the streak value to display (with grace period before noon)."""
         return obj.get_display_streak()
+
+from prayers.domain.constants import GroupRole, GroupPrivacy
+from prayers.models import Group, GroupMembership
+
+
+class GroupSerializer(serializers.ModelSerializer):
+    """Serializer for Group model."""
+    member_count = serializers.IntegerField(read_only=True)  # From annotation (Fix #6, #16)
+    is_member = serializers.IntegerField(read_only=True)  # From annotation (Fix #16)
+    user_role = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Group
+        fields = (
+            'id', 'name', 'description', 'privacy_level',
+            'created_by', 'created_at', 'member_count',
+            'is_member', 'user_role',
+        )
+        read_only_fields = ('id', 'created_by', 'created_at')
+    
+    def get_user_role(self, obj):
+        """Read role from annotated value or compute if needed."""
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        if hasattr(obj, 'user_role') and obj.user_role:
+            return obj.user_role
+        try:
+            membership = obj.memberships.get(
+                user=request.user,
+                is_active=True,
+            )
+            return membership.role
+        except GroupMembership.DoesNotExist:
+            return None
+
+
+class GroupMembershipSerializer(serializers.ModelSerializer):
+    """Serializer for GroupMembership."""
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.CharField(source='user.email', read_only=True)
+    
+    class Meta:
+        model = GroupMembership
+        fields = ('id', 'user', 'username', 'email', 'group', 'role', 'joined_at', 'is_active')
+        read_only_fields = ('id', 'joined_at')
