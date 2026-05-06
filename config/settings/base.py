@@ -12,14 +12,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Boot Validation
 REQUIRED_ENV_VARS = ['SECRET_KEY']
-for var in REQUIRED_ENV_VARS:
-    if not os.environ.get(var) and not os.environ.get('DEBUG'):
-         # We only enforce strictly in non-debug/production settings. 
-         # However, the plan asks for boot validation. 
-         # We'll implement a more flexible check in lauch.
-         pass
+if not os.environ.get('DEBUG', 'False').lower() == 'true':
+    missing = [var for var in REQUIRED_ENV_VARS if not os.environ.get(var)]
+    if missing:
+        raise ImproperlyConfigured(f"Missing required environment variables: {', '.join(missing)}")
 
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-local-dev-key-not-for-production-use')
+SECRET_KEY = os.environ.get('SECRET_KEY')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -51,7 +49,7 @@ MIDDLEWARE = [
     'prayers.middleware.SecurityEventLoggerMiddleware',
 ]
 
-ROOT_URLCONF = 'namaz_backend.urls'
+ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [
     {
@@ -69,7 +67,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'namaz_backend.wsgi.application'
+WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database - Flexible configuration
 DATABASES = {
