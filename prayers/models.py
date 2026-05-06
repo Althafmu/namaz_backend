@@ -52,9 +52,6 @@ class UserSettings(models.Model):
         return f'Settings for {self.user.username}'
 
 
-class UserSettings(models.Model):
-    """Stores per-user calculation settings for cloud sync (EPIC 3)."""
-
 
 class EmailVerificationToken(models.Model):
     """Time-limited token for email verification."""

@@ -1,11 +1,32 @@
+# Comprehensive gitignore for Python/Django/IDE/OS
+# Bytecode / Cache
 __pycache__/
 *.py[cod]
-*.class
+*$py.class
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Environment
 .env
+.env.*
 .venv/
+env/
+venv/
+ENV/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Django
 staticfiles/
 db.sqlite3
+media/
 logs/
