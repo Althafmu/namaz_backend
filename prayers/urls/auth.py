@@ -10,7 +10,7 @@ from prayers.views.auth_views import (
     PasswordResetConfirmView,
     GoogleAuthView,
 )
-from config.urls import CustomTokenObtainPairView
+from core.authentication.views import CustomTokenObtainPairView
 
 urlpatterns = [
     # JWT Authentication

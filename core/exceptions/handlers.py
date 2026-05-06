@@ -75,5 +75,4 @@ def api_exception_handler(exc, context):
                 }
             )
 
-    response.data = response.data
     return response

@@ -18,5 +18,5 @@ def health_check(request):
     return Response({
         "status": "ok",
         "database": db_status,
-    })
+    }, status=200 if db_status == "ok" else 500)
 

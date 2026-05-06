@@ -8,12 +8,12 @@ auth_logger = logging.getLogger('core.auth')
 throttle_logger = logging.getLogger('core.throttle')
 
 CLEAR_TEXT_ENDPOINTS = frozenset({
-    '/api/auth/login/',
-    '/api/auth/register/',
-    '/api/auth/password-reset/',
-    '/api/auth/password-reset/confirm/',
-    '/api/auth/verify-email/',
-    '/api/auth/resend-verification/',
+    '/api/v1/auth/login/',
+    '/api/v1/auth/register/',
+    '/api/v1/auth/password-reset/',
+    '/api/v1/auth/password-reset/confirm/',
+    '/api/v1/auth/verify-email/',
+    '/api/v1/auth/resend-verification/',
 })
 
 ANOMALY_PATTERNS = [
