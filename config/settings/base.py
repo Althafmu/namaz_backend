@@ -30,7 +30,7 @@ INSTALLED_APPS = [
 ]
 
 # ... current content ...
-SESSIONS_MIDDLEWARE = [
+MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
