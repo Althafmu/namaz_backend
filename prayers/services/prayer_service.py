@@ -4,44 +4,90 @@ from django.utils import timezone
 
 from prayers.models import DailyPrayerLog, Streak
 from prayers.services.status_service import CanonicalPrayerStatus, canonical_to_db
-from prayers.selectors import get_today_log, get_prayer_history
+from prayers.selectors import get_today_log
 from prayers.utils.time_utils import get_effective_today
 
 @transaction.atomic
-def log_prayer(user, prayer_name, completed, in_jamaat=False, location='home', reason=None, date_str=None, logged_at=None, prayer_time_windows=None, config=None):
+def update_today_log(
+    user,
+    data: dict,
+    target_date=None,
+) -> DailyPrayerLog:
+    """
+    Update today's prayer log with validated data.
+    """
+    if target_date is None:
+        target_date = get_effective_today()
+    
+    # Get the log for today
+    log = DailyPrayerLog.objects.get(user=user, date=target_date)
+    
+    # Update using serializer for validation
+    serializer = DailyPrayerLogSerializer(log, data=data, partial=True)
+    if serializer.is_valid():
+        updated_log = serializer.save()
+        
+        # Update streak
+        streak, _ = Streak.objects.get_or_create(user=user)
+        streak.recalculate(force=False, changed_date=target_date)
+        
+        # Attach recovery info
+        attach_recovery_to_logs([updated_log], user)
+        
+        return updated_log
+    else:
+        raise ValueError(f"Validation error: {serializer.errors}")
+
+
+@transaction.atomic
+def log_prayer(
+    user,
+    prayer_name: str,
+    completed: bool,
+    in_jamaat: bool = False,
+    location: str = 'home',
+    reason: str = None,
+    date_str: str = None,
+    prayed_jumah: bool = False,
+    request=None,
+) -> DailyPrayerLog:
     """
     Service method to log a single prayer.
     All business logic is centralized here.
     """
     # Parse logged_at
-    if logged_at:
-        if isinstance(logged_at, str):
-            try:
-                dt = datetime.fromisoformat(logged_at)
-                logged_at = dt if timezone.is_aware(dt) else timezone.make_aware(dt)
-            except ValueError:
-                raise ValueError("Invalid logged_at format. Expected ISO datetime.")
-        else:
-            raise ValueError("logged_at must be an ISO datetime string.")
+    from prayers.services.prayer_status_service import classify_prayer_status
+    from prayers.selectors import get_effective_today
+    
+    target_date = None
+    if date_str:
+        try:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            raise ValueError("Invalid date format. Expected YYYY-MM-DD.")
     else:
-        logged_at = timezone.now()
+        target_date = get_effective_today()
     
     # Resolve status
     from prayers.services.prayer_status_service import classify_prayer_status
-    if prayer_time_windows:
-        canonical_status = classify_prayer_status(
-            prayer_name=prayer_name,
-            logged_at=logged_at,
-            prayer_time_windows=prayer_time_windows,
-            config=config or {},
-        )
-        status = canonical_to_db(canonical_status)
+    if request and hasattr(request, 'data'):
+        prayer_time_windows = request.data.get("prayer_time_windows")
+        config = request.data.get("config", {})
+        if prayer_time_windows:
+            canonical_status = classify_prayer_status(
+                prayer_name=prayer_name,
+                logged_at=timezone.now(),
+                prayer_time_windows=prayer_time_windows,
+                config=config,
+            )
+            status = canonical_to_db(canonical_status)
+        else:
+            # Compatibility fallback
+            status = "pending" if not completed else "on_time"
     else:
-        # Compatibility fallback
-        status = _resolve_status_from_request(prayer_name, completed, reason)
+        status = "pending" if not completed else "on_time"
     
-    # Get or create log
-    target_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else get_effective_today()
+    # Get or create log (service owns creation)
     log, created = DailyPrayerLog.objects.get_or_create(
         user=user,
         date=target_date,
@@ -67,7 +113,7 @@ def log_prayer(user, prayer_name, completed, in_jamaat=False, location='home', r
     log.location = location
     
     if prayer_name == 'dhuhr':
-        log.prayed_jumah = in_jamaat
+        log.prayed_jumah = prayed_jumah
     
     log.full_clean()
     log.save()
@@ -83,20 +129,53 @@ def log_prayer(user, prayer_name, completed, in_jamaat=False, location='home', r
     return log
 
 
-def _resolve_status_from_request(prayer_name, completed, reason):
-    """Helper to resolve status from request (compatibility)."""
-    from prayers.services.status_service import CanonicalPrayerStatus
-    if not completed:
-        return CanonicalPrayerStatus.MISSED
+@transaction.atomic
+def undo_last_action(
+    user,
+    target_date=None,
+) -> DailyPrayerLog:
+    """
+    Undo the last prayer action for a given date.
+    Returns the updated log or None if no action to undo.
+    """
+    if target_date is None:
+        target_date = get_effective_today() - timedelta(days=1)
     
-    # This is simplified - in reality, you'd check time windows
-    return CanonicalPrayerStatus.ONTIME
+    try:
+        log = DailyPrayerLog.objects.get(user=user, date=target_date)
+        # Reset all prayers to False (undo logic)
+        log.fajr = False
+        log.dhuhr = False
+        log.asr = False
+        log.maghrib = False
+        log.isha = False
+        log.fajr_status = 'pending'
+        log.dhuhr_status = 'pending'
+        log.asr_status = 'pending'
+        log.maghrib_status = 'pending'
+        log.isha_status = 'pending'
+        log.location = 'home'
+        log.save()
+        
+        # Update streak
+        streak, _ = Streak.objects.get_or_create(user=user)
+        streak.recalculate(force=False, changed_date=target_date)
+        
+        # Attach recovery info
+        attach_recovery_to_logs([log], user)
+        
+        return log
+    except DailyPrayerLog.DoesNotExist:
+        return None
 
 
 @transaction.atomic
-def set_excused_day(user, target_date):
+def set_excused_day(
+    user,
+    target_date,
+) -> DailyPrayerLog:
     """Mark a day as excused."""
-    log, _ = DailyPrayerLog.objects.get_or_create(
+    log, created = DailyPrayerLog.objects.get_or_create(
         user=user,
         date=target_date,
     )
@@ -117,7 +196,10 @@ def set_excused_day(user, target_date):
 
 
 @transaction.atomic
-def clear_excused_day(user, target_date):
+def clear_excused_day(
+    user,
+    target_date,
+) -> DailyPrayerLog:
     """Clear excused status for a day."""
     try:
         log = DailyPrayerLog.objects.get(user=user, date=target_date)

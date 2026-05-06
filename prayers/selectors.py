@@ -4,18 +4,21 @@ from django.db.models import Q, Count, Case, When, IntegerField, F
 from prayers.models import DailyPrayerLog, Streak
 
 def get_today_log(user, target_date=None):
-    """Get or create today's prayer log for a user."""
+    """Get today's prayer log for a user (read-only)."""
     if target_date is None:
         target_date = timezone.localdate()
-    log, created = DailyPrayerLog.objects.get_or_create(
-        user=user,
-        date=target_date,
-    )
-    return log, created
+    try:
+        log = DailyPrayerLog.objects.get(
+            user=user,
+            date=target_date,
+        )
+        return log, False  # False = not created
+    except DailyPrayerLog.DoesNotExist:
+        return None, False  # None = not found
 
 
 def get_prayer_history(user, days=7, page=1, page_size=30):
-    """Get prayer history with pagination."""
+    """Get prayer history with pagination (read-only)."""
     today = timezone.localdate()
     start_date = today - timezone.timedelta(days=days - 1)
     
@@ -42,7 +45,7 @@ def get_prayer_history(user, days=7, page=1, page_size=30):
 
 
 def get_detailed_prayer_history(user, days=30):
-    """Get detailed prayer history statistics."""
+    """Get detailed prayer history statistics (read-only)."""
     today = timezone.localdate()
     start_date = today - timezone.timedelta(days=days - 1)
     
@@ -71,7 +74,7 @@ def get_detailed_prayer_history(user, days=30):
 
 
 def get_reason_summary(user, days=30):
-    """Get summary of reasons for missed prayers."""
+    """Get summary of reasons for missed prayers (read-only)."""
     today = timezone.localdate()
     start_date = today - timezone.timedelta(days=days - 1)
     
@@ -90,13 +93,20 @@ def get_reason_summary(user, days=30):
 
 
 def get_sync_status(user):
-    """Get sync status for a user."""
+    """Get sync status for a user (read-only)."""
     from prayers.models import UserSettings
-    settings, _ = UserSettings.objects.get_or_create(user=user)
-    streak, _ = Streak.objects.get_or_create(user=user)
+    try:
+        settings = UserSettings.objects.get(user=user)
+    except UserSettings.DoesNotExist:
+        settings = None
+    
+    try:
+        streak = Streak.objects.get(user=user)
+    except Streak.DoesNotExist:
+        streak = None
     
     return {
         'settings': settings,
         'streak': streak,
-        'last_sync': streak.last_recalculated_at,
+        'last_sync': streak.last_recalculated_at if streak else None,
     }
