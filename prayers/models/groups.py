@@ -19,6 +19,7 @@ class Group(models.Model):
         choices=PRIVACY_CHOICES,
         default=GroupPrivacy.PRIVATE,
     )
+    invite_code = models.CharField(max_length=12, unique=True, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -36,6 +37,17 @@ class Group(models.Model):
     
     def __str__(self):
         return self.name
+    
+    def generate_invite_code(self):
+        """Generate a unique invite code like NAMAZ-8F2KQ7."""
+        if self.invite_code:
+            return self.invite_code
+        while True:
+            code = f"NAMAZ-{get_random_string(6, 'ABCDEFGHIJKLMNPQRSTUVWXYZ23456789')}"
+            if not Group.objects.filter(invite_code=code).exists():
+                self.invite_code = code
+                self.save(update_fields=['invite_code'])
+                return code
 
 
 class GroupMembershipQuerySet(models.QuerySet):

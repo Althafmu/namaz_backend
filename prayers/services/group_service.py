@@ -2,6 +2,31 @@ from prayers.models import Group, GroupMembership, GroupInviteToken
 from prayers.domain.constants import GroupRole, GroupPrivacy, GROUP_MAX_MEMBERS, MembershipStatus
 
 
+def user_is_group_admin(user, group) -> bool:
+    """Check if user is an admin of the group."""
+    try:
+        membership = GroupMembership.objects.active().get(
+            user=user,
+            group=group,
+        )
+        return membership.is_admin
+    except GroupMembership.DoesNotExist:
+        return False
+
+
+def create_membership(user, group, role=GroupRole.MEMBER) -> GroupMembership:
+    """Create a new membership for the user in the group."""
+    if GroupMembership.objects.active().filter(user=user, group=group).exists():
+        raise ValueError("Already a member of this group")
+    
+    return GroupMembership.objects.create(
+        user=user,
+        group=group,
+        role=role,
+        status=MembershipStatus.ACTIVE,
+    )
+
+
 def user_can_manage_group(user, group) -> bool:
     """Check if user can manage group settings/members."""
     try:

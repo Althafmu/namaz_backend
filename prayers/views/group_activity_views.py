@@ -3,11 +3,13 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 
+from prayers.models import Group
 from prayers.selectors.group_selectors import get_group_by_id
 from prayers.selectors.group_dashboard_selector import get_group_activities
 from prayers.serializers.group_dashboard_serializers import ActivitySerializer
 from prayers.services.group_service import user_can_view_group
 from prayers.domain.constants import GroupPrivacy
+from prayers.utils.error_utils import not_found_response, unauthorized_response, forbidden_response
 
 
 @api_view(['GET'])
@@ -20,13 +22,13 @@ def group_activity_view(request, group_id):
     try:
         group = get_group_by_id(group_id)
     except Group.DoesNotExist:
-        return Response({'error': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
+        return not_found_response('Group not found')
 
     if group.privacy_level != GroupPrivacy.PUBLIC and not request.user.is_authenticated:
-        return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+        return unauthorized_response()
 
     if not user_can_view_group(request.user, group):
-        return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
+        return forbidden_response()
 
     activities = get_group_activities(group, limit=20)
     serializer = ActivitySerializer(activities, many=True)

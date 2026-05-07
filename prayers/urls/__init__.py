@@ -21,6 +21,7 @@ from prayers.views.settings_views import (
 from prayers.views.streak_views import streak_view, consume_protector_token
 from prayers.views.group_dashboard_views import group_dashboard_view
 from prayers.views.group_activity_views import group_activity_view
+from prayers.views.group_invite_views import generate_invite_code, join_group
 
 app_name = "prayers"
 
@@ -53,4 +54,7 @@ urlpatterns = [
     path('groups/<int:group_id>/dashboard/', group_dashboard_view, name='group-dashboard'),
     # G2.3: Group Activity Feed
     path('groups/<int:group_id>/activity/', group_activity_view, name='group-activity'),
+    # G2.4: Group Invite
+    path('groups/invite-code/', generate_invite_code, name='generate-invite-code'),
+    path('groups/join/', join_group, name='join-group'),
 ]
