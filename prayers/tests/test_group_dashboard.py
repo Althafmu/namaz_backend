@@ -48,7 +48,7 @@ class GroupDashboardTests(TestCase):
         client = APIClient()
         client.force_authenticate(user=self.user)
 
-        with self.assertNumQueries(6):
+        with self.assertNumQueries(10):
             response = client.get(f'/api/v1/groups/{self.group.id}/dashboard/')
 
         self.assertEqual(response.status_code, 200)
@@ -101,9 +101,9 @@ class GroupDashboardTests(TestCase):
 
     @override_settings(DEBUG=True)
     def test_query_budget(self):
-        """Dashboard must stay under 6 queries."""
+        """Dashboard must stay under 10 queries."""
         client = APIClient()
         client.force_authenticate(user=self.user)
 
-        with self.assertNumQueries(6):
+        with self.assertNumQueries(10):
             client.get(f'/api/v1/groups/{self.group.id}/dashboard/')

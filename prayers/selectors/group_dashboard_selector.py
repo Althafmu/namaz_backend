@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db.models import Count, Q, F
 from django.utils import timezone
 
@@ -58,11 +60,16 @@ def get_group_dashboard(group, user):
         for idx, m in enumerate(top_streaks)
     ]
 
-    # Calculate current user rank if applicable
+    # Calculate current user rank across ALL active members
     if current_user_data:
         user_streak = current_user_data['current_streak']
-        rank = sum(1 for m in top_streaks if (m.streak_count or 0) > user_streak) + 1
-        current_user_data['rank'] = rank
+        # Count all active members with higher streaks
+        higher_count = GroupMembership.objects.filter(
+            group=group,
+            status=MembershipStatus.ACTIVE,
+            user__streak__current_streak__gt=user_streak
+        ).count()
+        current_user_data['rank'] = higher_count + 1
 
     # Query 4: Today's prayer completion stats
     today = timezone.localdate()
@@ -87,8 +94,8 @@ def get_group_dashboard(group, user):
         'isha': today_stats['isha_completed'] or 0,
     }
 
-    # Query 5: Recent activity (placeholder for G2.3)
-    recent_activity = []
+    # Query 5: Recent activity (G2.3)
+    recent_activity = get_group_activities(group)
 
     return {
         'group': {
@@ -107,3 +114,69 @@ def get_group_dashboard(group, user):
         'recent_activity': recent_activity,
         'today_completion': today_completion,
     }
+
+
+def get_group_activities(group, limit=20):
+    """
+    Collect recent group activities from multiple sources.
+    Target: ≤3 queries.
+    """
+    activities = []
+    now = timezone.now()
+    thirty_days_ago = now - timedelta(days=30)
+
+    # Query 1: Recent joins (last 30 days)
+    recent_joins = GroupMembership.objects.filter(
+        group=group,
+        status=MembershipStatus.ACTIVE,
+        joined_at__gte=thirty_days_ago
+    ).select_related('user').order_by('-joined_at')[:10]
+
+    for m in recent_joins:
+        if m.user and m.user.username:
+            activities.append({
+                'type': 'join',
+                'username': m.user.username,
+                'created_at': m.joined_at if m.joined_at else now,
+                'message': f'{m.user.username} joined the group'
+            })
+
+    # Query 2: Recent streak achievements (active members with significant streaks)
+    high_streaks = GroupMembership.objects.filter(
+        group=group,
+        status=MembershipStatus.ACTIVE,
+    ).select_related('user__streak').filter(
+        user__streak__current_streak__gte=7
+    ).order_by('-user__streak__current_streak')[:10]
+
+    for m in high_streaks:
+        streak = getattr(m.user, 'streak', None)
+        if streak and streak.current_streak >= 7 and m.user and m.user.username:
+            activities.append({
+                'type': 'streak_milestone',
+                'username': m.user.username,
+                'created_at': streak.last_recalculated_at if streak.last_recalculated_at else now,
+                'message': f'{m.user.username} has {streak.current_streak} day streak 🔥'
+            })
+
+    # Query 3: Perfect day completions (last 7 days)
+    today = timezone.localdate()
+    perfect_days = DailyPrayerLog.objects.filter(
+        user__group_memberships__group=group,
+        user__group_memberships__status=MembershipStatus.ACTIVE,
+        date__gte=today - timedelta(days=7),
+        fajr=True, dhuhr=True, asr=True, maghrib=True, isha=True
+    ).select_related('user').order_by('-date')[:10]
+
+    for log in perfect_days:
+        if log.user and log.user.username:
+            activities.append({
+                'type': 'completion',
+                'username': log.user.username,
+                'created_at': log.created_at if log.created_at else now,
+                'message': f'{log.user.username} completed all 5 prayers'
+            })
+
+    # Sort by created_at descending, return top `limit`
+    activities.sort(key=lambda x: x['created_at'], reverse=True)
+    return activities[:limit]
