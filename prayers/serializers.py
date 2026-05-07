@@ -179,7 +179,7 @@ class GroupSerializer(serializers.ModelSerializer):
         try:
             membership = obj.memberships.get(
                 user=request.user,
-                is_active=True,
+                status='active',
             )
             return membership.role
         except GroupMembership.DoesNotExist:
@@ -193,5 +193,5 @@ class GroupMembershipSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = GroupMembership
-        fields = ('id', 'user', 'username', 'email', 'group', 'role', 'joined_at', 'is_active')
+        fields = ('id', 'user', 'username', 'email', 'group', 'role', 'joined_at', 'status')
         read_only_fields = ('id', 'joined_at')

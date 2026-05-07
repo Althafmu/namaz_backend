@@ -1,5 +1,5 @@
+from django.db import transaction
 from django.utils import timezone
-from django.utils.crypto import get_random_string
 
 from prayers.models.auth_tokens import EmailVerificationToken
 
@@ -21,6 +21,7 @@ def create_verification_token(user):
     return instance.token
 
 
+@transaction.atomic
 def consume_verification_token(token_str):
     """
     Validate and consume a verification token.

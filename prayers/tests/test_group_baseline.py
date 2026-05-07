@@ -1,5 +1,6 @@
 """
 Query baseline tests for G1 Group models.
+Enforces strict query count assertions.
 """
 from django.test import TestCase
 from django.test.utils import override_settings
@@ -33,45 +34,37 @@ class GroupQueryBaselineTests(TestCase):
 
     @override_settings(DEBUG=True)
     def test_group_list_query_count(self):
-        """Baseline: group list with annotations."""
+        """Baseline: group list with annotations. Must be 1 query."""
         from prayers.selectors import get_group_queryset
         # Pass user so user_is_member gets annotated
-        qs = get_group_queryset(user=self.user)
-        # Access to trigger evaluation
-        groups = list(qs)
+        with self.assertNumQueries(1):
+            qs = get_group_queryset(user=self.user)
+            groups = list(qs)
+
         self.assertEqual(len(groups), 1)
-        
+
         # Check annotations exist
         group = groups[0]
         self.assertTrue(hasattr(group, 'member_count'))
         self.assertTrue(hasattr(group, 'user_is_member'))
-        
-        from django.db import connection
-        query_count = len(connection.queries)
-        print(f"\nGroup list query count: {query_count}")
-        self.assertLessEqual(query_count, 5)
 
     @override_settings(DEBUG=True)
     def test_group_detail_query_count(self):
-        """Baseline: group detail with annotations."""
+        """Baseline: group detail with annotations. Must be 1 query."""
         from prayers.selectors import get_group_queryset
-        qs = get_group_queryset(user=self.user).filter(id=self.group.id)
-        group = qs.first()
-        
+        with self.assertNumQueries(1):
+            qs = get_group_queryset(user=self.user).filter(id=self.group.id)
+            group = qs.first()
+
         self.assertIsNotNone(group)
         self.assertTrue(hasattr(group, 'member_count'))
         self.assertTrue(hasattr(group, 'user_is_member'))
-        
-        from django.db import connection
-        query_count = len(connection.queries)
-        print(f"\nGroup detail query count: {query_count}")
-        self.assertLessEqual(query_count, 5)
 
     def test_group_max_members_enforcement(self):
         """Test GROUP_MAX_MEMBERS is enforced."""
         from prayers.services.group_service import user_can_join_group
         from prayers.domain.constants import GROUP_MAX_MEMBERS
-        
+
         # Fill group to max
         for i in range(GROUP_MAX_MEMBERS):
             u = User.objects.create_user(
@@ -80,7 +73,7 @@ class GroupQueryBaselineTests(TestCase):
                 password='pass'
             )
             GroupMembership.objects.create(user=u, group=self.group)
-        
+
         # Try to add one more
         u_extra = User.objects.create_user(
             username='extra@test.com',

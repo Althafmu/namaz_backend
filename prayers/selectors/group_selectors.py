@@ -12,7 +12,7 @@ def get_group_queryset(user=None, privacy_filter=None):
     
     # Annotate member counts (Issue 6: avoid N+1)
     qs = qs.annotate(
-        member_count=Count('memberships', filter=Q(memberships__is_active=True))
+        member_count=Count('memberships', filter=Q(memberships__status='active'))
     )
     
     # Annotate user membership if user provided (Fix #16)
@@ -20,7 +20,7 @@ def get_group_queryset(user=None, privacy_filter=None):
         qs = qs.annotate(
             user_is_member=Count(
                 'memberships',
-                filter=Q(memberships__user=user, memberships__is_active=True)
+                filter=Q(memberships__user=user, memberships__status='active')
             )
         )
     
@@ -31,8 +31,8 @@ def get_user_groups_queryset(user):
     """Return QuerySet of groups user belongs to."""
     return Group.objects.filter(
         memberships__user=user,
-        memberships__is_active=True,
+        memberships__status='active',
     ).annotate(
-        member_count=Count('memberships', filter=Q(memberships__is_active=True))
+        member_count=Count('memberships', filter=Q(memberships__status='active'))
     ).order_by('-created_at')
 

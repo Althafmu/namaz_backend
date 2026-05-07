@@ -14,8 +14,8 @@ from prayers.serializers import (
     EmailVerificationSerializer,
 )
 from prayers.models import EmailVerificationToken, PasswordResetToken
-from prayers.services.auth_service import create_verification_token, consume_verification_token
-from prayers.services.password_reset_service import request_password_reset, can_request_reset, consume_reset_token
+from apps.accounts.services.auth_service import create_verification_token, consume_verification_token
+from apps.accounts.services.password_reset_service import request_password_reset, can_request_reset, consume_reset_token
 from prayers.utils.email_service import EmailService
 from apps.accounts.serializers import (
     RegisterResponseSerializer,

@@ -96,6 +96,6 @@ from datetime import timedelta
 from django.db.models import Count
 from django.utils import timezone
 
-from prayers.models import DailyPrayerLog, Group, GroupMembership
+from prayers.models import DailyPrayerLog
 
 

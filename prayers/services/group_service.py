@@ -8,7 +8,7 @@ def user_can_manage_group(user, group) -> bool:
         membership = GroupMembership.objects.get(
             user=user,
             group=group,
-            is_active=True,
+            status='active',
         )
         return membership.is_admin
     except GroupMembership.DoesNotExist:
@@ -30,7 +30,7 @@ def user_can_view_group(user, group) -> bool:
     return GroupMembership.objects.filter(
         user=user,
         group=group,
-        is_active=True,
+        status='active',
     ).exists()
 
 
@@ -40,12 +40,12 @@ def user_can_join_group(user, group, invite_token=None) -> tuple:
     if GroupMembership.objects.filter(
         user=user,
         group=group,
-        is_active=True,
+        status='active',
     ).exists():
         return False, "Already a member of this group."
     
     # Check group size limit (Issue #8)
-    active_members = group.memberships.filter(is_active=True).count()
+    active_members = group.memberships.filter(status='active').count()
     if active_members >= GROUP_MAX_MEMBERS:
         return False, f"Group has reached maximum membership limit ({GROUP_MAX_MEMBERS})."
     
@@ -78,7 +78,7 @@ def user_can_see_member_prayers(user, group, target_member) -> bool:
         viewer_membership = GroupMembership.objects.get(
             user=user,
             group=group,
-            is_active=True,
+            status='active',
         )
     except GroupMembership.DoesNotExist:
         return False
@@ -98,7 +98,7 @@ def get_group_roles_for_user(user, group) -> list:
         membership = GroupMembership.objects.get(
             user=user,
             group=group,
-            is_active=True,
+            status='active',
         )
         if membership.is_admin:
             return [GroupRole.ADMIN, GroupRole.MEMBER]

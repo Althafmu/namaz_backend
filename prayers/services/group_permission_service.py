@@ -8,7 +8,7 @@ def can_add_member(user, group) -> bool:
         actor = GroupMembership.objects.get(
             user=user,
             group=group,
-            is_active=True,
+            status='active',
         )
         return actor.is_admin
     except GroupMembership.DoesNotExist:
@@ -21,7 +21,7 @@ def can_remove_member(user, group, target_member) -> bool:
         actor = GroupMembership.objects.get(
             user=user,
             group=group,
-            is_active=True,
+            status='active',
         )
         if not actor.is_admin:
             return False
@@ -37,7 +37,7 @@ def can_modify_role(user, group, target_member, new_role) -> bool:
         actor = GroupMembership.objects.get(
             user=user,
             group=group,
-            is_active=True,
+            status='active',
         )
         if not actor.is_admin:
             return False
@@ -53,7 +53,7 @@ def can_revoke_invite(user, group, invite) -> bool:
         actor = GroupMembership.objects.get(
             user=user,
             group=group,
-            is_active=True,
+            status='active',
         )
         return actor.is_admin
     except GroupMembership.DoesNotExist:

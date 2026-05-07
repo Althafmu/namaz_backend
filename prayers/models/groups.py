@@ -41,6 +41,12 @@ class Group(models.Model):
 class GroupMembership(models.Model):
     """Links users to groups with role-based access."""
     ROLE_CHOICES = GroupRole.choices()
+    MEMBERSHIP_STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('left', 'Left'),
+        ('removed', 'Removed'),
+        ('banned', 'Banned'),
+    ]
     
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -58,7 +64,11 @@ class GroupMembership(models.Model):
         default=GroupRole.MEMBER,
     )
     joined_at = models.DateTimeField(auto_now_add=True)
-    is_active = models.BooleanField(default=True)
+    status = models.CharField(
+        max_length=20,
+        choices=MEMBERSHIP_STATUS_CHOICES,
+        default='active',
+    )
     
     class Meta:
         constraints = [

@@ -47,9 +47,9 @@ def consume_invite_token(token_str, user):
         defaults={'role': GroupRole.MEMBER},
     )
     
-    if not created and not membership.is_active:
-        membership.is_active = True
-        membership.save(update_fields=['is_active'])
+    if not created and membership.status != 'active':
+        membership.status = 'active'
+        membership.save(update_fields=['status'])
     
     invite.uses_count += 1
     if invite.uses_count >= invite.max_uses:

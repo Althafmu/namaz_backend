@@ -1,10 +1,11 @@
+from django.db import transaction
 from django.utils import timezone
-from django.utils.crypto import get_random_string
 
 from prayers.models.auth_tokens import PasswordResetToken
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 
 
+@transaction.atomic
 def request_password_reset(user):
     """
     Request a password reset for user.
@@ -34,6 +35,7 @@ def can_request_reset(user):
     return not recent
 
 
+@transaction.atomic
 def consume_reset_token(token_str, new_password):
     """
     Validate and consume a token to reset the password.
