@@ -40,3 +40,8 @@ def get_user_groups_queryset(user):
         member_count=Count('memberships', filter=Q(memberships__status=MembershipStatus.ACTIVE))
     ).order_by('-created_at')
 
+
+def get_group_by_id(group_id):
+    """Get group by ID. Returns Group object or raises DoesNotExist."""
+    return Group.objects.get(id=group_id)
+

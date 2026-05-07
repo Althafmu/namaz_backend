@@ -1,10 +1,9 @@
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
-from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 
-from prayers.models import Group
+from prayers.selectors.group_selectors import get_group_by_id
 from prayers.selectors.group_dashboard_selector import get_group_activities
 from prayers.serializers.group_dashboard_serializers import ActivitySerializer
 from prayers.services.group_service import user_can_view_group
@@ -12,7 +11,6 @@ from prayers.domain.constants import GroupPrivacy
 
 
 @api_view(['GET'])
-@authentication_classes([SessionAuthentication])
 @permission_classes([AllowAny])
 def group_activity_view(request, group_id):
     """
@@ -20,7 +18,7 @@ def group_activity_view(request, group_id):
     Returns recent activities (joins, milestones, completions).
     """
     try:
-        group = Group.objects.get(id=group_id)
+        group = get_group_by_id(group_id)
     except Group.DoesNotExist:
         return Response({'error': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
 
