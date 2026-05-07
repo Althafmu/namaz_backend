@@ -1,9 +1,3 @@
-from datetime import timedelta
-from django.utils import timezone
-from django.db.models import Q, Count, Case, When, IntegerField, F
-from prayers.models import DailyPrayerLog, Streak
-
-
 def get_today_log(user, target_date=None):
     """Get today's prayer log for a user (read-only). Returns (log, created_bool)."""
     if target_date is None:
@@ -21,7 +15,7 @@ def get_today_log(user, target_date=None):
 def get_prayer_history_queryset(user, days=7):
     """Return QuerySet of prayer logs for N days. No pagination semantics."""
     today = timezone.localdate()
-    start_date = today - timezone.timedelta(days=days - 1)
+    start_date = today - timedelta(days=days - 1)
     
     return DailyPrayerLog.objects.filter(
         user=user,
@@ -101,35 +95,3 @@ from django.db.models import Count
 from prayers.models import Group, GroupMembership
 
 
-def get_group_queryset(user=None, privacy_filter=None):
-    """Return QuerySet of groups. No pagination/evaluation."""
-    qs = Group.objects.all()
-    
-    if privacy_filter:
-        qs = qs.filter(privacy_level=privacy_filter)
-    
-    # Annotate member counts (Issue 6: avoid N+1)
-    qs = qs.annotate(
-        member_count=Count('memberships', filter=Q(memberships__is_active=True))
-    )
-    
-    # Annotate user membership if user provided (Fix #16)
-    if user:
-        qs = qs.annotate(
-            user_is_member=Count(
-                'memberships',
-                filter=Q(memberships__user=user, memberships__is_active=True)
-            )
-        )
-    
-    return qs.order_by('-created_at')
-
-
-def get_user_groups_queryset(user):
-    """Return QuerySet of groups user belongs to."""
-    return Group.objects.filter(
-        memberships__user=user,
-        memberships__is_active=True,
-    ).annotate(
-        member_count=Count('memberships', filter=Q(memberships__is_active=True))
-    ).order_by('-created_at')
