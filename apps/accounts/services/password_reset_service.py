@@ -3,6 +3,7 @@ from django.utils import timezone
 
 from prayers.models.auth_tokens import PasswordResetToken
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+from .result_contracts import AuthResult
 
 
 @transaction.atomic
@@ -39,17 +40,17 @@ def can_request_reset(user):
 def consume_reset_token(token_str, new_password):
     """
     Validate and consume a token to reset the password.
-    Returns (user, error_message) tuple.
+    Returns AuthResult.
     """
     try:
         token = PasswordResetToken.objects.select_related('user').get(token=token_str)
     except PasswordResetToken.DoesNotExist:
-        return None, "Invalid or expired reset token."
+        return AuthResult.error_result("Invalid or expired reset token.")
 
     if not token.is_valid():
         token.is_used = True
         token.save(update_fields=['is_used'])
-        return None, "Invalid or expired reset token."
+        return AuthResult.error_result("Invalid or expired reset token.")
 
     user = token.user
     user.set_password(new_password)
@@ -63,4 +64,4 @@ def consume_reset_token(token_str, new_password):
     for outstanding_token in outstanding_tokens:
         BlacklistedToken.objects.get_or_create(token=outstanding_token)
 
-    return user, None
+    return AuthResult.success_result(user)

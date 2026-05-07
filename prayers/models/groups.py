@@ -5,7 +5,7 @@ from django.db import models
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 
-from prayers.domain.constants import GroupRole, GroupPrivacy
+from prayers.domain.constants import GroupRole, GroupPrivacy, MembershipStatus
 
 
 class Group(models.Model):
@@ -38,15 +38,30 @@ class Group(models.Model):
         return self.name
 
 
+class GroupMembershipQuerySet(models.QuerySet):
+    """Custom QuerySet for GroupMembership with domain-specific filters."""
+    
+    def active(self):
+        """Return only active memberships."""
+        return self.filter(status=MembershipStatus.ACTIVE)
+    
+    def banned(self):
+        """Return only banned memberships."""
+        return self.filter(status=MembershipStatus.BANNED)
+    
+    def left(self):
+        """Return only memberships where user left."""
+        return self.filter(status=MembershipStatus.LEFT)
+    
+    def removed(self):
+        """Return only removed memberships."""
+        return self.filter(status=MembershipStatus.REMOVED)
+
+
 class GroupMembership(models.Model):
     """Links users to groups with role-based access."""
     ROLE_CHOICES = GroupRole.choices()
-    MEMBERSHIP_STATUS_CHOICES = [
-        ('active', 'Active'),
-        ('left', 'Left'),
-        ('removed', 'Removed'),
-        ('banned', 'Banned'),
-    ]
+    STATUS_CHOICES = MembershipStatus.choices()
     
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -66,9 +81,11 @@ class GroupMembership(models.Model):
     joined_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(
         max_length=20,
-        choices=MEMBERSHIP_STATUS_CHOICES,
-        default='active',
+        choices=STATUS_CHOICES,
+        default=MembershipStatus.ACTIVE,
     )
+    
+    objects = GroupMembershipQuerySet.as_manager()
     
     class Meta:
         constraints = [

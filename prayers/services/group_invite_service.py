@@ -2,7 +2,7 @@ import hashlib
 from django.db import transaction
 from django.utils.crypto import get_random_string
 from prayers.models import GroupInviteToken, GroupMembership
-from prayers.domain.constants import GroupRole
+from prayers.domain.constants import GroupRole, MembershipStatus
 
 
 @transaction.atomic
@@ -47,8 +47,8 @@ def consume_invite_token(token_str, user):
         defaults={'role': GroupRole.MEMBER},
     )
     
-    if not created and membership.status != 'active':
-        membership.status = 'active'
+    if not created and membership.status != MembershipStatus.ACTIVE:
+        membership.status = MembershipStatus.ACTIVE
         membership.save(update_fields=['status'])
     
     invite.uses_count += 1

@@ -179,7 +179,7 @@ class GroupSerializer(serializers.ModelSerializer):
         try:
             membership = obj.memberships.get(
                 user=request.user,
-                status='active',
+                status=MembershipStatus.ACTIVE,
             )
             return membership.role
         except GroupMembership.DoesNotExist:

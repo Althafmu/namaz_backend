@@ -1,14 +1,13 @@
 from prayers.models import Group, GroupMembership, GroupInviteToken
-from prayers.domain.constants import GroupRole, GroupPrivacy, GROUP_MAX_MEMBERS
+from prayers.domain.constants import GroupRole, GroupPrivacy, GROUP_MAX_MEMBERS, MembershipStatus
 
 
 def user_can_manage_group(user, group) -> bool:
     """Check if user can manage group settings/members."""
     try:
-        membership = GroupMembership.objects.get(
+        membership = GroupMembership.objects.active().get(
             user=user,
             group=group,
-            status='active',
         )
         return membership.is_admin
     except GroupMembership.DoesNotExist:
@@ -27,25 +26,23 @@ def user_can_view_group(user, group) -> bool:
         return True
     
     # Private/Invite-only: must be active member
-    return GroupMembership.objects.filter(
+    return GroupMembership.objects.active().filter(
         user=user,
         group=group,
-        status='active',
     ).exists()
 
 
 def user_can_join_group(user, group, invite_token=None) -> tuple:
     """Returns (allowed: bool, reason: str). Enforces GROUP_MAX_MEMBERS (Issue #8)."""
     # Check if already member
-    if GroupMembership.objects.filter(
+    if GroupMembership.objects.active().filter(
         user=user,
         group=group,
-        status='active',
     ).exists():
         return False, "Already a member of this group."
     
     # Check group size limit (Issue #8)
-    active_members = group.memberships.filter(status='active').count()
+    active_members = group.memberships.active().count()
     if active_members >= GROUP_MAX_MEMBERS:
         return False, f"Group has reached maximum membership limit ({GROUP_MAX_MEMBERS})."
     
@@ -75,10 +72,9 @@ def user_can_see_member_prayers(user, group, target_member) -> bool:
     Note: Fine-grained privacy settings will be added in G2/G3.
     """
     try:
-        viewer_membership = GroupMembership.objects.get(
+        viewer_membership = GroupMembership.objects.active().get(
             user=user,
             group=group,
-            status='active',
         )
     except GroupMembership.DoesNotExist:
         return False
@@ -95,10 +91,9 @@ def user_can_see_member_prayers(user, group, target_member) -> bool:
 def get_group_roles_for_user(user, group) -> list:
     """Get list of roles user can assign (admin only)."""
     try:
-        membership = GroupMembership.objects.get(
+        membership = GroupMembership.objects.active().get(
             user=user,
             group=group,
-            status='active',
         )
         if membership.is_admin:
             return [GroupRole.ADMIN, GroupRole.MEMBER]

@@ -59,7 +59,18 @@ class GroupPrivacy(str, Enum):
     PUBLIC = "public"
     PRIVATE = "private"
     INVITE_ONLY = "invite_only"
+    
+    @classmethod
+    def choices(cls):
+        return [(e.value, e.name) for e in cls]
 
+
+class MembershipStatus(str, Enum):
+    ACTIVE = "active"
+    LEFT = "left"
+    REMOVED = "removed"
+    BANNED = "banned"
+    
     @classmethod
     def choices(cls):
         return [(e.value, e.name) for e in cls]

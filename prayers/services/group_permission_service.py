@@ -5,10 +5,9 @@ from prayers.domain.constants import GroupRole
 def can_add_member(user, group) -> bool:
     """Check if user can add members."""
     try:
-        actor = GroupMembership.objects.get(
+        actor = GroupMembership.objects.active().get(
             user=user,
             group=group,
-            status='active',
         )
         return actor.is_admin
     except GroupMembership.DoesNotExist:
@@ -18,10 +17,9 @@ def can_add_member(user, group) -> bool:
 def can_remove_member(user, group, target_member) -> bool:
     """Check if user can remove a member."""
     try:
-        actor = GroupMembership.objects.get(
+        actor = GroupMembership.objects.active().get(
             user=user,
             group=group,
-            status='active',
         )
         if not actor.is_admin:
             return False
@@ -34,10 +32,9 @@ def can_remove_member(user, group, target_member) -> bool:
 def can_modify_role(user, group, target_member, new_role) -> bool:
     """Check if user can change member's role."""
     try:
-        actor = GroupMembership.objects.get(
+        actor = GroupMembership.objects.active().get(
             user=user,
             group=group,
-            status='active',
         )
         if not actor.is_admin:
             return False
@@ -50,10 +47,9 @@ def can_modify_role(user, group, target_member, new_role) -> bool:
 def can_revoke_invite(user, group, invite) -> bool:
     """Check if user can revoke invite tokens."""
     try:
-        actor = GroupMembership.objects.get(
+        actor = GroupMembership.objects.active().get(
             user=user,
             group=group,
-            status='active',
         )
         return actor.is_admin
     except GroupMembership.DoesNotExist:
