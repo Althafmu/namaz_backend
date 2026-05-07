@@ -20,6 +20,7 @@ from prayers.views.settings_views import (
 )
 from prayers.views.streak_views import streak_view, consume_protector_token
 from prayers.views.group_dashboard_views import group_dashboard_view
+from prayers.views.group_activity_views import group_activity_view
 
 app_name = "prayers"
 
@@ -50,4 +51,6 @@ urlpatterns = [
     path('notifications/pause-today/', pause_notifications_today_view, name='pause-notifications-today-legacy'),
     # G2.1: Group Dashboard
     path('groups/<int:group_id>/dashboard/', group_dashboard_view, name='group-dashboard'),
+    # G2.3: Group Activity Feed
+    path('groups/<int:group_id>/activity/', group_activity_view, name='group-activity'),
 ]
