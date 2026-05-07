@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.utils import timezone
 
 def get_effective_today():
@@ -7,5 +9,5 @@ def get_effective_today():
     """
     now = timezone.localtime()
     if now.hour < 3:
-        return (now - timezone.timedelta(days=1)).date()
+        return (now - timedelta(days=1)).date()
     return now.date()

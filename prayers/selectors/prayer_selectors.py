@@ -28,7 +28,7 @@ def get_prayer_history_queryset(user, days=7):
 def get_detailed_prayer_history(user, days=30):
     """Get detailed prayer history statistics (read-only). Returns dict with QuerySet."""
     today = timezone.localdate()
-    start_date = today - timezone.timedelta(days=days - 1)
+    start_date = today - timedelta(days=days - 1)
     
     logs = DailyPrayerLog.objects.filter(
         user=user,
@@ -57,7 +57,7 @@ def get_detailed_prayer_history(user, days=30):
 def get_reason_summary(user, days=30):
     """Get summary of reasons for missed prayers (read-only). Returns QuerySet."""
     today = timezone.localdate()
-    start_date = today - timezone.timedelta(days=days - 1)
+    start_date = today - timedelta(days=days - 1)
     
     logs = DailyPrayerLog.objects.filter(
         user=user,
@@ -91,7 +91,11 @@ def get_sync_status(user):
     }
 
 
+from datetime import timedelta
+
 from django.db.models import Count
-from prayers.models import Group, GroupMembership
+from django.utils import timezone
+
+from prayers.models import DailyPrayerLog, Group, GroupMembership
 
 

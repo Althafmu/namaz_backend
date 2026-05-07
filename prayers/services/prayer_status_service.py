@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, time
+from datetime import datetime, timedelta, time
 
 from django.utils import timezone
 
@@ -31,7 +31,7 @@ def _resolve_isha_qada_cutoff(prayer_name, prayer_window, config, logged_at):
 
     start_dt = _as_datetime(prayer_window.get("start"))
     anchor_local_date = timezone.localtime(start_dt or logged_at).date()
-    return timezone.make_aware(datetime.combine(anchor_local_date, time.min)) + timezone.timedelta(days=1, hours=3)
+    return timezone.make_aware(datetime.combine(anchor_local_date, time.min)) + timedelta(days=1, hours=3)
 
 
 def classify_prayer_status(prayer_name, logged_at, prayer_time_windows, config=None):

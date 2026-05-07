@@ -168,7 +168,7 @@ class Streak(models.Model):
         if self.current_streak > 0 or now.hour >= 12 or not self.last_completed_date:
             return self.current_streak
 
-        yesterday = today - timezone.timedelta(days=1)
+        yesterday = today - timedelta(days=1)
         if self.last_completed_date != yesterday:
             return self.current_streak
 

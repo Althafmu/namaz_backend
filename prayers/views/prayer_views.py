@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, throttle_classes
@@ -167,9 +167,9 @@ def undo_last_prayer_action(request):
         if target_date_str:
             target_date = datetime.strptime(target_date_str, '%Y-%m-%d').date()
         else:
-            target_date = today - timezone.timedelta(days=1)
+            target_date = today - timedelta(days=1)
     except ValueError:
-        target_date = today - timezone.timedelta(days=1)
+        target_date = today - timedelta(days=1)
 
     try:
         log = undo_last_action(request.user, target_date)

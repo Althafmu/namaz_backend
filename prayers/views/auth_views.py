@@ -14,6 +14,8 @@ from prayers.serializers import (
     EmailVerificationSerializer,
 )
 from prayers.models import EmailVerificationToken, PasswordResetToken
+from prayers.services.auth_service import create_verification_token, consume_verification_token
+from prayers.services.password_reset_service import request_password_reset, can_request_reset, consume_reset_token
 from prayers.utils.email_service import EmailService
 from apps.accounts.serializers import (
     RegisterResponseSerializer,
@@ -150,7 +152,7 @@ class ResendVerificationEmailView(generics.GenericAPIView):
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
-        token = EmailVerificationToken.create_for_user(user)
+        token = create_verification_token(user)
         EmailService.send_verification_email(user, token, request)
 
         return Response(
@@ -190,13 +192,13 @@ class PasswordResetRequestView(generics.GenericAPIView):
             )
 
         # Rate limit check
-        if not PasswordResetToken.can_user_request_reset(user):
+        if not can_request_reset(user):
             return Response(
                 {"error": "Too many reset requests. Please wait an hour before trying again."},
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
-        token = PasswordResetToken.create_for_user(user)
+        token = request_password_reset(user)
         EmailService.send_password_reset_email(user, token, request)
 
         return Response(
@@ -221,7 +223,7 @@ class PasswordResetConfirmView(generics.GenericAPIView):
         token_str = serializer.validated_data['token']
         new_password = serializer.validated_data['password']
 
-        user, error = PasswordResetToken.consume_token(token_str, new_password)
+        user, error = consume_reset_token(token_str, new_password)
         if error:
             return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
 
