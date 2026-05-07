@@ -6,7 +6,8 @@ from rest_framework import status
 from prayers.models import Group
 from prayers.selectors.group_selectors import get_group_by_id
 from prayers.services.group_service import user_is_group_admin, create_membership
-from prayers.utils.error_utils import not_found_response, unauthorized_response, forbidden_response
+from prayers.utils.error_utils import not_found_response, forbidden_response, error_response
+from prayers.domain.constants import GroupPrivacy
 
 
 @api_view(['POST'])
@@ -38,14 +39,14 @@ def join_group(request):
     invite_code = request.data.get('invite_code', '').strip().upper()
     
     if not invite_code:
-        return unauthorized_response('Invite code required')
+        return error_response('Invite code required', 'invalid_request', status.HTTP_400_BAD_REQUEST)
 
     try:
         group = Group.objects.get(invite_code=invite_code)
     except Group.DoesNotExist:
         return not_found_response('Invalid invite code')
 
-    if group.privacy_level == 'PRIVATE':
+    if group.privacy_level == GroupPrivacy.PRIVATE:
         return forbidden_response('This group requires approval. Contact the group admin.')
 
     try:

@@ -55,6 +55,6 @@ urlpatterns = [
     # G2.3: Group Activity Feed
     path('groups/<int:group_id>/activity/', group_activity_view, name='group-activity'),
     # G2.4: Group Invite
-    path('groups/invite-code/', generate_invite_code, name='generate-invite-code'),
+    path('groups/<int:group_id>/invite-code/', generate_invite_code, name='generate-invite-code'),
     path('groups/join/', join_group, name='join-group'),
 ]
