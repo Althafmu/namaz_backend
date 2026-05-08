@@ -105,6 +105,7 @@ def get_group_dashboard(group, user):
             'privacy_level': group_data.privacy_level,
             'member_count': group_data.member_count,
             'created_by': group_data.created_by.username,
+            'invite_code': group_data.invite_code,
         },
         'current_user': current_user_data,
         'stats': {

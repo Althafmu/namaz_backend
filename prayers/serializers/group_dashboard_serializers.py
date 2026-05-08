@@ -9,6 +9,7 @@ class GroupSummarySerializer(serializers.Serializer):
     privacy_level = serializers.CharField()
     member_count = serializers.IntegerField()
     created_by = serializers.CharField()
+    invite_code = serializers.CharField(allow_null=True)
 
 
 class CurrentUserGroupSerializer(serializers.Serializer):
