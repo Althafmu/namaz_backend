@@ -86,3 +86,36 @@ def join_group(request):
         'group_id': group.id,
         'group_name': group.name,
     })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_group(request):
+    """
+    Create a new group.
+    Expected: {"name": "Group Name"}
+    Returns: {"id": group_id, "name": group_name, "invite_code": invite_code}
+    """
+    name = request.data.get('name', '').strip()
+
+    if not name:
+        return error_response('Group name is required', 'MISSING_NAME', status.HTTP_400_BAD_REQUEST)
+
+    if len(name) > 100:
+        return error_response('Group name must be 100 characters or less', 'NAME_TOO_LONG', status.HTTP_400_BAD_REQUEST)
+
+    group = Group.objects.create(
+        name=name,
+        created_by=request.user,
+        privacy_level=GroupPrivacy.PRIVATE,
+    )
+
+    group.generate_invite_code()
+
+    create_membership(request.user, group, 'ADMIN')
+
+    return Response({
+        'id': group.id,
+        'name': group.name,
+        'invite_code': group.invite_code,
+    })
