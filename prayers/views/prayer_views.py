@@ -191,12 +191,32 @@ def sync_status_view(request):
 @api_view(['GET'])
 def detailed_prayer_history(request):
     today = get_effective_today()
-    try:
-        year = int(request.query_params.get('year', today.year))
-    except (ValueError, TypeError):
-        return error_response("INVALID_YEAR", "year parameter must be a valid integer", status.HTTP_400_BAD_REQUEST)
 
-    result = get_detailed_prayer_history(request.user, year=year)
+    year = request.query_params.get('year')
+    if year:
+        try:
+            year = int(year)
+        except (ValueError, TypeError):
+            return error_response("INVALID_YEAR", "year parameter must be a valid integer", status.HTTP_400_BAD_REQUEST)
+    else:
+        year = today.year
+
+    month = request.query_params.get('month')
+    if month:
+        try:
+            month = int(month)
+        except (ValueError, TypeError):
+            return error_response("INVALID_MONTH", "month parameter must be a valid integer", status.HTTP_400_BAD_REQUEST)
+    else:
+        month = today.month
+
+    page = request.query_params.get('page', 1)
+    try:
+        page = int(page)
+    except (ValueError, TypeError):
+        page = 1
+
+    result = get_detailed_prayer_history(request.user, year=year, month=month, page=page)
     return Response(result)
 
 

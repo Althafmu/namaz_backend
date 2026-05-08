@@ -25,50 +25,70 @@ def get_prayer_history_queryset(user, days=7):
     # Returns QuerySet - caller decides pagination
 
 
-def get_detailed_prayer_history(user, days=30):
-    """Get detailed prayer history statistics (read-only). Returns dict with QuerySet."""
+def get_detailed_prayer_history(user, year=None, month=None, days=30, page=1, page_size=30):
+    """Get detailed prayer history statistics (read-only). Returns dict with paginated results."""
+    from datetime import date
+
     today = timezone.localdate()
-    start_date = today - timedelta(days=days - 1)
-    
+
+    if year and month:
+        try:
+            start_date = date(year, month, 1)
+            if month == 12:
+                end_date = date(year + 1, 1, 1) - timedelta(days=1)
+            else:
+                end_date = date(year, month + 1, 1) - timedelta(days=1)
+        except ValueError:
+            start_date = today - timedelta(days=days - 1)
+            end_date = today
+    else:
+        start_date = today - timedelta(days=days - 1)
+        end_date = today
+
     logs = DailyPrayerLog.objects.filter(
         user=user,
         date__gte=start_date,
-        date__lte=today,
+        date__lte=end_date,
     ).order_by('-date')
-    
-    # Calculate statistics
-    total_days = logs.count()
-    completed_days = logs.filter(
-        fajr=True,
-        dhuhr=True,
-        asr=True,
-        maghrib=True,
-        isha=True,
-    ).count()
-    
+
+    total_count = logs.count()
+    total_pages = (total_count + page_size - 1) // page_size
+    offset = (page - 1) * page_size
+    paginated_logs = logs[offset:offset + page_size]
+
+    from prayers.serializers import DailyPrayerLogSerializer
+    serializer = DailyPrayerLogSerializer(paginated_logs, many=True)
+
     return {
-        'logs': logs,  # QuerySet, not evaluated
-        'total_days': total_days,
-        'completed_days': completed_days,
-        'completion_rate': (completed_days / total_days * 100) if total_days > 0 else 0,
+        'results': serializer.data,
+        'count': total_count,
+        'page': page,
+        'total_pages': total_pages,
+        'page_size': page_size,
     }
 
 
 def get_reason_summary(user, days=30):
-    """Get summary of reasons for missed prayers (read-only). Returns QuerySet."""
+    """Get summary of reasons for missed prayers. Returns dict with reasons map."""
     today = timezone.localdate()
     start_date = today - timedelta(days=days - 1)
-    
+
     logs = DailyPrayerLog.objects.filter(
         user=user,
         date__gte=start_date,
         date__lte=today,
     )
-    
-    # Aggregate reasons - returns QuerySet (not evaluated)
-    return logs.values('fajr_reason', 'dhuhr_reason', 'asr_reason', 'maghrib_reason', 'isha_reason').annotate(
-        count=Count('id')
-    )
+
+    reason_counts = {}
+    prayer_fields = ['fajr_reason', 'dhuhr_reason', 'asr_reason', 'maghrib_reason', 'isha_reason']
+
+    for log in logs:
+        for field in prayer_fields:
+            reason = getattr(log, field)
+            if reason:
+                reason_counts[reason] = reason_counts.get(reason, 0) + 1
+
+    return {"reasons": reason_counts}
 
 
 def get_sync_status(user):
