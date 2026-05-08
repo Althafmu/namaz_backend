@@ -3,11 +3,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
-from prayers.models import Group
+from prayers.models import Group, GroupMembership
 from prayers.selectors.group_selectors import get_group_by_id
 from prayers.services.group_service import user_is_group_admin, create_membership
 from prayers.utils.error_utils import not_found_response, forbidden_response, error_response
-from prayers.domain.constants import GroupPrivacy
+from prayers.domain.constants import GroupPrivacy, MembershipStatus, GROUP_MAX_MEMBERS
 
 
 @api_view(['POST'])
@@ -48,6 +48,33 @@ def join_group(request):
 
     if group.privacy_level == GroupPrivacy.PRIVATE:
         return forbidden_response('This group requires approval. Contact the group admin.')
+
+    # Check if user is banned
+    if GroupMembership.objects.filter(
+        user=request.user,
+        group=group,
+        status=MembershipStatus.BANNED
+    ).exists():
+        return forbidden_response('You are banned from this group.')
+
+    # Check group capacity
+    active_members = group.memberships.active().count()
+    if active_members >= GROUP_MAX_MEMBERS:
+        return forbidden_response(f'Group has reached maximum membership limit ({GROUP_MAX_MEMBERS}).')
+
+    # Check if already a member (idempotent join)
+    existing = GroupMembership.objects.active().filter(
+        user=request.user,
+        group=group,
+    ).first()
+    
+    if existing:
+        return Response({
+            'success': True,
+            'already_joined': True,
+            'group_id': group.id,
+            'group_name': group.name,
+        })
 
     try:
         membership = create_membership(request.user, group, 'MEMBER')
