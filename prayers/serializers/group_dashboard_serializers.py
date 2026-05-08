@@ -14,7 +14,7 @@ class GroupSummarySerializer(serializers.Serializer):
 class CurrentUserGroupSerializer(serializers.Serializer):
     """Current user's membership info in group."""
     role = serializers.CharField()
-    joined_at = serializers.DateTimeField()
+    joined_at = serializers.DateTimeField(allow_null=True)
     current_streak = serializers.IntegerField()
     rank = serializers.IntegerField(allow_null=True)
 
@@ -30,7 +30,7 @@ class ActivitySerializer(serializers.Serializer):
     """Activity feed item for dashboard."""
     type = serializers.CharField()
     username = serializers.CharField()
-    created_at = serializers.DateTimeField()
+    created_at = serializers.DateTimeField(allow_null=True)
 
 
 class TodayCompletionSerializer(serializers.Serializer):

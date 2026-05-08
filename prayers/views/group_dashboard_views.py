@@ -2,6 +2,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+import logging
 
 from prayers.models import Group
 from prayers.selectors.group_selectors import get_group_by_id
@@ -10,6 +11,8 @@ from prayers.serializers.group_dashboard_serializers import DashboardSerializer
 from prayers.services.group_service import user_can_view_group
 from prayers.domain.constants import GroupPrivacy
 from prayers.utils.error_utils import not_found_response, unauthorized_response, forbidden_response
+
+logger = logging.getLogger(__name__)
 
 
 @api_view(['GET'])
@@ -38,8 +41,15 @@ def group_dashboard_view(request, group_id):
         return not_found_response()
 
     # Serialize and return
-    serializer = DashboardSerializer(data)
-    return Response(serializer.data)
+    try:
+        serializer = DashboardSerializer(data)
+        return Response(serializer.data)
+    except Exception as e:
+        logger.error(f"Dashboard serialization error for group {group_id}: {e}", exc_info=True)
+        return Response(
+            {"error": "Failed to load dashboard data", "detail": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(['GET'])

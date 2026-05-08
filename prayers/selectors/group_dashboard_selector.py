@@ -38,7 +38,7 @@ def get_group_dashboard(group, user):
             streak = getattr(membership.user, 'streak', None)
             current_user_data = {
                 'role': membership.role,
-                'joined_at': membership.joined_at,
+                'joined_at': membership.joined_at or timezone.now(),
                 'current_streak': streak.current_streak if streak else 0,
                 'rank': None  # Calculated below
             }
