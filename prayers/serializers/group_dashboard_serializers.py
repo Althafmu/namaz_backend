@@ -31,6 +31,7 @@ class ActivitySerializer(serializers.Serializer):
     type = serializers.CharField()
     username = serializers.CharField()
     created_at = serializers.DateTimeField(allow_null=True)
+    message = serializers.CharField(allow_null=True, required=False, allow_blank=True)
 
 
 class TodayCompletionSerializer(serializers.Serializer):
