@@ -1,5 +1,5 @@
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -40,3 +40,34 @@ def group_dashboard_view(request, group_id):
     # Serialize and return
     serializer = DashboardSerializer(data)
     return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_groups_view(request):
+    """
+    Return list of groups the authenticated user belongs to.
+    """
+    from rest_framework.permissions import IsAuthenticated
+    from prayers.selectors.group_selectors import get_user_groups_queryset
+
+    groups = get_user_groups_queryset(request.user).values(
+        'id', 'name', 'privacy_level', 'member_count'
+    )
+
+    memberships = request.user.group_memberships.filter(
+        status='active'
+    ).values('group_id', 'role')
+    role_map = {m['group_id']: m['role'] for m in memberships}
+
+    result = []
+    for group in groups:
+        result.append({
+            'id': group['id'],
+            'name': group['name'],
+            'privacy_level': group['privacy_level'],
+            'member_count': group['member_count'],
+            'user_role': role_map.get(group['id'], 'member'),
+        })
+
+    return Response(result)

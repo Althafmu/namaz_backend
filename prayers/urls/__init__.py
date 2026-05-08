@@ -19,7 +19,7 @@ from prayers.views.settings_views import (
     pause_notifications_today_view,
 )
 from prayers.views.streak_views import streak_view, consume_protector_token
-from prayers.views.group_dashboard_views import group_dashboard_view
+from prayers.views.group_dashboard_views import group_dashboard_view, my_groups_view
 from prayers.views.group_activity_views import group_activity_view
 from prayers.views.group_invite_views import generate_invite_code, join_group
 
@@ -57,4 +57,5 @@ urlpatterns = [
     # G2.4: Group Invite
     path('groups/<int:group_id>/invite-code/', generate_invite_code, name='generate-invite-code'),
     path('groups/join/', join_group, name='join-group'),
+    path('groups/my/', my_groups_view, name='my-groups'),
 ]
