@@ -80,6 +80,13 @@ DATABASES = {
     )
 }
 
+# SQLite protection: disallow SQLite in production
+if os.environ.get('DATABASE_URL', '').startswith('sqlite:') and \
+   os.environ.get('DEBUG', 'False') == 'False':
+    raise ImproperlyConfigured(
+        "SQLite is not allowed in production. Set DATABASE_URL to a production database."
+    )
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
