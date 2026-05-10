@@ -41,7 +41,7 @@ def join_group(request):
     if not invite_code:
         return error_response('Invite code required', 'invalid_request', status.HTTP_400_BAD_REQUEST)
 
-try:
+    try:
         group = Group.objects.get(invite_code=invite_code)
     except Group.DoesNotExist:
         return not_found_response('Invalid invite code')
