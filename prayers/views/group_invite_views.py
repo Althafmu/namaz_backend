@@ -5,7 +5,7 @@ from rest_framework import status
 
 from prayers.models import Group, GroupMembership
 from prayers.selectors.group_selectors import get_group_by_id
-from prayers.services.group_service import user_is_group_admin, create_membership
+from prayers.services.group_service import user_is_group_admin, create_membership, user_can_join_group
 from prayers.utils.error_utils import not_found_response, forbidden_response, error_response
 from prayers.domain.constants import GroupPrivacy, MembershipStatus, GROUP_MAX_MEMBERS
 
@@ -41,40 +41,26 @@ def join_group(request):
     if not invite_code:
         return error_response('Invite code required', 'invalid_request', status.HTTP_400_BAD_REQUEST)
 
-    try:
+try:
         group = Group.objects.get(invite_code=invite_code)
     except Group.DoesNotExist:
         return not_found_response('Invalid invite code')
 
-    if group.privacy_level == GroupPrivacy.PRIVATE:
-        return forbidden_response('This group requires approval. Contact the group admin.')
-
-    # Check if user is banned
-    if GroupMembership.objects.filter(
-        user=request.user,
-        group=group,
-        status=MembershipStatus.BANNED
-    ).exists():
-        return forbidden_response('You are banned from this group.')
-
-    # Check group capacity
-    active_members = group.memberships.active().count()
-    if active_members >= GROUP_MAX_MEMBERS:
-        return forbidden_response(f'Group has reached maximum membership limit ({GROUP_MAX_MEMBERS}).')
+    can_join, reason = user_can_join_group(request.user, group)
+    if not can_join:
+        return forbidden_response(reason)
 
     # Check if already a member (idempotent join)
     existing = GroupMembership.objects.active().filter(
         user=request.user,
         group=group,
     ).first()
-    
+
     if existing:
         return Response({
-            'success': True,
-            'already_joined': True,
             'group_id': group.id,
-            'group_name': group.name,
-        })
+            'detail': 'Already a member',
+        }, status=status.HTTP_409_CONFLICT)
 
     try:
         membership = create_membership(request.user, group, 'MEMBER')
@@ -107,7 +93,7 @@ def create_group(request):
     group = Group.objects.create(
         name=name,
         created_by=request.user,
-        privacy_level=GroupPrivacy.PRIVATE,
+        privacy_level=GroupPrivacy.INVITE_ONLY,
     )
 
     group.generate_invite_code()
