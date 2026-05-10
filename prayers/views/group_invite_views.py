@@ -46,11 +46,6 @@ def join_group(request):
     except Group.DoesNotExist:
         return not_found_response('Invalid invite code')
 
-    can_join, reason = user_can_join_group(request.user, group)
-    if not can_join:
-        return forbidden_response(reason)
-
-    # Check if already a member (idempotent join)
     existing = GroupMembership.objects.active().filter(
         user=request.user,
         group=group,
@@ -61,6 +56,10 @@ def join_group(request):
             'group_id': group.id,
             'detail': 'Already a member',
         }, status=status.HTTP_409_CONFLICT)
+
+    can_join, reason = user_can_join_group(request.user, group)
+    if not can_join:
+        return forbidden_response(reason)
 
     try:
         membership = create_membership(request.user, group, 'MEMBER')
