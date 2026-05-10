@@ -104,3 +104,43 @@ def create_group(request):
         'name': group.name,
         'invite_code': group.invite_code,
     })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def validate_invite_code(request):
+    """
+    Validate an invite code without creating membership.
+    Returns group info so user can confirm before joining.
+    """
+    invite_code = request.data.get('invite_code', '').strip().upper()
+
+    if not invite_code:
+        return error_response('Invite code required', 'invalid_request', status.HTTP_400_BAD_REQUEST)
+
+    try:
+        group = Group.objects.get(invite_code=invite_code)
+    except Group.DoesNotExist:
+        return not_found_response('Invalid invite code')
+
+    existing = GroupMembership.objects.active().filter(
+        user=request.user,
+        group=group,
+    ).first()
+
+    if existing:
+        return Response({
+            'group_id': group.id,
+            'group_name': group.name,
+            'is_already_member': True,
+        }, status=status.HTTP_409_CONFLICT)
+
+    can_join, reason = user_can_join_group(request.user, group)
+    if not can_join:
+        return forbidden_response(reason)
+
+    return Response({
+        'group_id': group.id,
+        'group_name': group.name,
+        'is_already_member': False,
+    })
